@@ -202,10 +202,15 @@ class Parser:
         t = self.advance()
         directive = t.value
 
-        if self.peek().type == "COLON":
+        # Handle colon-separated nested keys: section:subsection:key
+        colon_parts = [directive]
+        while self.peek().type == "COLON":
             self.advance()
             if self.peek().type == "IDENT":
-                directive += ":" + self.advance().value
+                colon_parts.append(self.advance().value)
+            else:
+                break
+        directive = ":".join(colon_parts)
 
         if directive.startswith("bind"):
             return self.parse_bind(directive, t.line)
@@ -245,6 +250,24 @@ class Parser:
             if prefix == "device":
                 return self.parse_device(directive[colon_idx + 1:], t.line)
 
+        # Handle colon-separated nested key: section:key = value
+        if len(colon_parts) >= 3:
+            section_name = colon_parts[0]
+            sub_key = ":".join(colon_parts[1:])
+            self.expect("EQUALS")
+            val = self.parse_value_rest()
+            body = [Directive(sub_key, [val], t.line, 0)]
+            return Section(section_name, body, t.line)
+
+        # Handle colon-separated section:key = value (two parts)
+        if len(colon_parts) == 2:
+            section_name = colon_parts[0]
+            inner_key = colon_parts[1]
+            self.expect("EQUALS")
+            val = self.parse_value_rest()
+            body = [Directive(inner_key, [val], t.line, 0)]
+            return Section(section_name, body, t.line)
+
         return self.parse_general_directive(directive, t.line)
 
     def parse_general_directive(self, directive: str, line: int) -> Optional[BlockStmt]:
@@ -281,7 +304,12 @@ class Parser:
         mode = values[1].strip() if len(values) > 1 else "preferred"
         position = values[2].strip() if len(values) > 2 else "auto"
         scale = values[3].strip() if len(values) > 3 else "1"
-        return MonitorDirective(name, mode, position, scale, line)
+        extra = {}
+        for i in range(4, len(values), 2):
+            key = values[i].strip()
+            val = values[i + 1].strip() if i + 1 < len(values) else "true"
+            extra[key] = val
+        return MonitorDirective(name, mode, position, scale, line, extra)
 
     def parse_windowrule(self, is_v2: bool, line: int) -> WindowRule:
         self.expect("EQUALS")

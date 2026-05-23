@@ -61,6 +61,7 @@ class MonitorDirective:
     position: str
     scale: str
     line: int
+    extra: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

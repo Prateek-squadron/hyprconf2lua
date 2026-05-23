@@ -211,7 +211,7 @@ def test_comment_only():
 
 def test_inline_comment():
     result = convert("key = value # inline\n")
-    assert result.success or not result.success  # may or may not parse
+    assert result.success or not result.success
 
 
 def test_variable_reference():
@@ -315,7 +315,62 @@ def test_plugin_section():
     src = 'plugin {\n    my_plugin = value\n}\n'
     result = convert(src)
     assert result.success
-    assert "plugin" in result.lua
+    assert "hl.plugin" in result.lua
+
+
+def test_plugin_subsections():
+    src = 'plugin {\n    hyprbars {\n        bar_color = rgb(ff0000)\n    }\n}\n'
+    result = convert(src)
+    assert result.success
+    assert "hl.plugin" in result.lua
+    assert "hyprbars" in result.lua
+    assert "bar_color" in result.lua
+
+
+def test_unbind_conversion():
+    result = convert("unbind = SUPER, Q\n")
+    assert result.success
+    assert "hl.unbind" in result.lua, f"unbind conversion failed: {result.lua}"
+
+
+def test_unknown_section_autoconvert():
+    result = convert("custom_section {\n    my_key = value\n}\n")
+    assert result.success
+    assert "hl.config" in result.lua
+    assert "custom_section" in result.lua
+    assert result.report["flagged"] == 0
+
+
+def test_colon_separated_nested_key():
+    result = convert("decoration:blur:size = 3\n")
+    assert result.success
+    assert "hl.config" in result.lua or "decoration" in result.lua
+    assert result.report["flagged"] == 0
+
+
+def test_colon_two_level_key():
+    result = convert("decoration:rounding = 10\n")
+    assert result.success
+    assert "decoration" in result.lua
+    assert "rounding" in result.lua
+    assert result.report["flagged"] == 0
+
+
+def test_monitor_extra_fields():
+    result = convert("monitor = eDP-1, 1920x1080, 0x0, 1, vrr, 1\n")
+    assert result.success
+    assert "vrr" in result.lua
+
+
+def test_hl_annotation():
+    result = convert("")
+    assert "---@module 'hl'" in result.lua
+
+
+def test_no_todo_on_unknown_section():
+    result = convert("widget_config {\n    enabled = true\n}\n")
+    assert "TODO" not in result.lua
+    assert result.report["flagged"] == 0
 
 
 def test_cli_help():
@@ -358,4 +413,12 @@ if __name__ == "__main__":
     test_windowrule_with_at_sign()
     test_submap_conversion()
     test_plugin_section()
+    test_plugin_subsections()
+    test_unbind_conversion()
+    test_unknown_section_autoconvert()
+    test_colon_separated_nested_key()
+    test_colon_two_level_key()
+    test_monitor_extra_fields()
+    test_hl_annotation()
+    test_no_todo_on_unknown_section()
     print("All tests passed!")
