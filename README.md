@@ -72,11 +72,17 @@ pipx install hyprconf2lua
 pip install --user hyprconf2lua
 
 # or directly from the repo (no pip needed)
-git clone https://github.com/YOUR_USERNAME/hyprconf2lua.git
+git clone https://github.com/Prateek-squadron/hyprconf2lua.git
+cd hyprconf2lua
 python3 -m hyprconf2lua ~/.config/hypr/hyprland.conf > hyprland.lua
 ```
 
 > **"externally managed environment" error?** Modern distros (Arch, CachyOS, Fedora 40+, Debian 12+, Ubuntu 24.04+) protect the system Python from pip. Fixes: use `pipx install` (creates an isolated venv), `pip install --user` (installs for your user only), or create a venv (`python3 -m venv ~/venv && ~/venv/bin/pip install hyprconf2lua`). Avoid `--break-system-packages` unless you know what you're doing.
+>
+> **On Arch / CachyOS**, `pip` and `pipx` aren't shipped with Python itself. Install them first:
+> ```bash
+> sudo pacman -S python-pip python-pipx
+> ```
 
 ---
 
