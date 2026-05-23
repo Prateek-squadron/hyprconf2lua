@@ -130,11 +130,18 @@ class LayerRuleDirective:
     line: int
 
 
+@dataclass
+class SubmapDef:
+    name: str
+    body: List[BlockStmt]
+    line: int
+
+
 BlockStmt = Union[
     Directive, Section, VariableDef, ExecDirective, BindDirective,
     MonitorDirective, WindowRule, AnimationDirective, BezierDirective,
     EnvDirective, SourceDirective, DeviceSection, GestureDirective,
-    WorkspaceDirective, LayerRuleDirective, Comment,
+    WorkspaceDirective, LayerRuleDirective, SubmapDef, Comment,
 ]
 
 Block = List[BlockStmt]

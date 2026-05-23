@@ -303,6 +303,21 @@ def test_windowrule_with_at_sign():
     assert "@" in result.lua
 
 
+def test_submap_conversion():
+    src = 'submap = resize\nbind = , escape, submap, reset\nsubmap = reset\n'
+    result = convert(src)
+    assert result.success
+    assert "hl.define_submap" in result.lua, f"submap conversion failed: {result.lua}"
+    assert "resize" in result.lua
+
+
+def test_plugin_section():
+    src = 'plugin {\n    my_plugin = value\n}\n'
+    result = convert(src)
+    assert result.success
+    assert "plugin" in result.lua
+
+
 def test_cli_help():
     import subprocess
     result = subprocess.run([sys.executable, "-m", "hyprconf2lua", "--help"],
@@ -341,4 +356,6 @@ if __name__ == "__main__":
     test_mouse_bind_movewindow()
     test_mouse_bind_resizewindow()
     test_windowrule_with_at_sign()
+    test_submap_conversion()
+    test_plugin_section()
     print("All tests passed!")

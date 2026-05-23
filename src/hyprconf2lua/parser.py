@@ -76,7 +76,34 @@ class Parser:
             if stmt is not None:
                 stmts.append(stmt)
             self.skip_newlines()
-        return stmts
+        return self._group_submaps(stmts)
+
+    def _group_submaps(self, stmts: Block) -> Block:
+        result: Block = []
+        i = 0
+        while i < len(stmts):
+            s = stmts[i]
+            if isinstance(s, Directive) and s.key == "submap" and s.value and s.value[0].strip().lower() != "reset":
+                name = s.value[0].strip()
+                body: Block = []
+                i += 1
+                while i < len(stmts):
+                    inner = stmts[i]
+                    if isinstance(inner, Directive) and inner.key == "submap":
+                        val = inner.value[0].strip().lower() if inner.value else ""
+                        if val == "reset":
+                            i += 1
+                            break
+                    body.append(inner)
+                    i += 1
+                result.append(SubmapDef(name, body, s.line))
+            elif isinstance(s, Directive) and s.key == "submap_reset":
+                result.append(Comment("# submap = reset (orphan, no matching submap start)", s.line))
+                i += 1
+            else:
+                result.append(s)
+                i += 1
+        return result
 
     def parse_stmt(self) -> Optional[BlockStmt]:
         t = self.peek()
@@ -132,8 +159,9 @@ class Parser:
             return ""
         result = tokens[0]
         for t in tokens[1:]:
-            punctuation_no_space = {":", ",", "=", "+", "-", "%", "@", "^", "*", "|", "~", "(", ")", "[", "]", "{", "}"}
-            if t in punctuation_no_space or result[-1:] in punctuation_no_space:
+            no_space_before = {":", ",", "=", "+", "-", "%", "@", "^", "*", "|", "~"}
+            no_space_after = {":", ",", "="}
+            if t in no_space_before or result[-1:] in no_space_after:
                 result += t
             else:
                 result += " " + t
