@@ -24,8 +24,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/hyprconf2lua"
-Repository = "https://github.com/yourusername/hyprconf2lua"
+Homepage = "https://github.com/Prateek-squadron/hyprconf2lua"
+Repository = "https://github.com/Prateek-squadron/hyprconf2lua"
 
 [project.scripts]
 hyprconf2lua = "hyprconf2lua.cli:main"

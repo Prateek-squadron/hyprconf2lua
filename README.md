@@ -188,7 +188,7 @@ After conversion, search your `.lua` files for `TODO`:
 
 ## Project
 
-- **GitHub:** [github.com/YOUR_USERNAME/hyprconf2lua](https://github.com/YOUR_USERNAME/hyprconf2lua)
+- **GitHub:** [github.com/Prateek-squadron/hyprconf2lua](https://github.com/Prateek-squadron/hyprconf2lua)
 - **License:** MIT
 - **Contributions welcome** — Python, simple codebase, ~400 lines of core logic. If your config doesn't convert cleanly, open an issue or send a PR.
 
