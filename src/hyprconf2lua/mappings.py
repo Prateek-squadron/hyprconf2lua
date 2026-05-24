@@ -107,6 +107,7 @@ WINDOW_RULE_PARAM_MAP = {
     "pseudo":       ("pseudo", "true"),
     "stayfocused":  ("stay_focused", "true"),
     "group":        ("group", True),
+    "scroll_touchpad": ("scroll_touchpad", True),
 }
 
 WORKSPACE_RULE_MAP = {
