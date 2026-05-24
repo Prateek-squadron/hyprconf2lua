@@ -138,6 +138,10 @@ Examples:
     for w in result.warnings:
         print(f"Warning: {w}", file=sys.stderr)
 
+    if not result.lua.strip():
+        print("Error: conversion produced no output", file=sys.stderr)
+        sys.exit(1)
+
     if args.report:
         r = result.report
         total = r["translated"] + r["passthrough"] + r["flagged"]
