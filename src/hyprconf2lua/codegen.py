@@ -82,6 +82,8 @@ class Codegen:
             self.visit_monitor(stmt)
         elif isinstance(stmt, WindowRule):
             self.visit_windowrule(stmt)
+        elif isinstance(stmt, WindowRuleBlock):
+            self.visit_windowrule_block(stmt)
         elif isinstance(stmt, ExecDirective):
             self.visit_exec(stmt)
         elif isinstance(stmt, AnimationDirective):
@@ -102,6 +104,8 @@ class Codegen:
             self.visit_submap(stmt)
         elif isinstance(stmt, LayerRuleDirective):
             self.visit_layerrule(stmt)
+        elif isinstance(stmt, LayerRuleBlock):
+            self.visit_layerrule_block(stmt)
         else:
             self.flag_count += 1
             self.emit(f"-- TODO: manual review (unknown statement type: {type(stmt).__name__})")
@@ -139,13 +143,9 @@ class Codegen:
         val = self.resolve_val(val)
         if val.startswith("local_var_"):
             return val[len("local_var_"):]
-        if val.lower() == "true":
+        if val.lower() in ("true", "on", "yes"):
             return "true"
-        if val.lower() == "false":
-            return "false"
-        if val == "yes":
-            return "true"
-        if val == "no":
+        if val.lower() in ("false", "off", "no"):
             return "false"
         try:
             int(val)
@@ -685,6 +685,37 @@ class Codegen:
         self.dedent()
         self.emit("})")
 
+    def visit_windowrule_block(self, stmt: WindowRuleBlock):
+        self.translated_count += 1
+        name_str = stmt.name if stmt.name else re.sub(r'[^a-zA-Z0-9_-]', '_', f'rule_{stmt.line}')
+
+        self.emit("hl.window_rule({")
+        self.indent()
+        self.emit(f'name  = "{name_str}",')
+
+        if stmt.match:
+            self.emit("match = {")
+            self.indent()
+            for k, v in stmt.match.items():
+                self.emit(f"{k} = {self.quote(v)},")
+            self.dedent()
+            self.emit("},")
+
+        for key, vals in stmt.effects.items():
+            if len(vals) == 1:
+                parts = vals[0].split()
+                if len(parts) == 1:
+                    self.emit(f"{key} = {self.to_lua_val(parts[0])},")
+                else:
+                    lua_parts = [self.to_lua_val(p) for p in parts]
+                    self.emit(f"{key} = {{ {', '.join(lua_parts)} }},")
+            else:
+                lua_vals = [self.to_lua_val(v) for v in vals]
+                self.emit(f"{key} = {{ {', '.join(lua_vals)} }},")
+
+        self.dedent()
+        self.emit("})")
+
     def visit_exec(self, stmt: ExecDirective):
         self.translated_count += 1
         resolved = self.resolve_val(stmt.command)
@@ -858,6 +889,36 @@ class Codegen:
             parts = rule_lower.split(None, 1)
             if parts:
                 self.emit(f"{parts[0]} = {self.quote(parts[1]) if len(parts) > 1 else 'true'},")
+
+        self.dedent()
+        self.emit("})")
+
+    def visit_layerrule_block(self, stmt: LayerRuleBlock):
+        self.translated_count += 1
+        name_str = stmt.name if stmt.name else f'layerrule_{stmt.line}'
+
+        self.emit("hl.layer_rule({")
+        self.indent()
+
+        if stmt.match:
+            self.emit("match = {")
+            self.indent()
+            for k, v in stmt.match.items():
+                self.emit(f"{k} = {self.quote(v)},")
+            self.dedent()
+            self.emit("},")
+
+        for key, vals in stmt.effects.items():
+            if len(vals) == 1:
+                parts = vals[0].split()
+                if len(parts) == 1:
+                    self.emit(f"{key} = {self.to_lua_val(parts[0])},")
+                else:
+                    lua_parts = [self.to_lua_val(p) for p in parts]
+                    self.emit(f"{key} = {{ {', '.join(lua_parts)} }},")
+            else:
+                lua_vals = [self.to_lua_val(v) for v in vals]
+                self.emit(f"{key} = {{ {', '.join(lua_vals)} }},")
 
         self.dedent()
         self.emit("})")

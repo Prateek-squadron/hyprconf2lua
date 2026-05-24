@@ -311,7 +311,51 @@ class Parser:
             extra[key] = val
         return MonitorDirective(name, mode, position, scale, line, extra)
 
-    def parse_windowrule(self, is_v2: bool, line: int) -> WindowRule:
+    def _parse_rule_block_body(self) -> tuple:
+        """Parse windowrule/layerrule block content { ... }.
+        Returns (name, match dict, effects dict)."""
+        name = ""
+        match: Dict[str, str] = {}
+        effects: Dict[str, List[str]] = {}
+
+        self.skip_newlines()
+        self.expect("BLOCK_OPEN")
+        self.skip_newlines()
+
+        while self.peek().type not in ("BLOCK_CLOSE", "EOF"):
+            t = self.peek()
+            if t.type == "COMMENT":
+                self.advance()
+            elif t.type == "IDENT":
+                key_parts = [self.advance().value]
+                while self.peek().type == "COLON":
+                    self.advance()
+                    if self.peek().type == "IDENT":
+                        key_parts.append(self.advance().value)
+                    else:
+                        break
+                key = ":".join(key_parts)
+
+                self.expect("EQUALS")
+                val = self.parse_value_rest()
+
+                if key == "name":
+                    name = val
+                elif key.startswith("match:"):
+                    match[key[len("match:"):]] = val
+                else:
+                    effects[key] = [val]
+            else:
+                self.advance()
+            self.skip_newlines()
+
+        self.expect("BLOCK_CLOSE")
+        return name, match, effects
+
+    def parse_windowrule(self, is_v2: bool, line: int) -> Union[WindowRule, WindowRuleBlock]:
+        if self.peek().type == "BLOCK_OPEN":
+            name, match, effects = self._parse_rule_block_body()
+            return WindowRuleBlock(is_v2, name, match, effects, line)
         self.expect("EQUALS")
         values = self.parse_comma_values()
         rule = values[0].strip() if values else ""
@@ -419,7 +463,10 @@ class Parser:
         params = [v.strip() for v in values[1:]]
         return WorkspaceDirective(name, params, line)
 
-    def parse_layerrule(self, line: int) -> LayerRuleDirective:
+    def parse_layerrule(self, line: int) -> Union[LayerRuleDirective, LayerRuleBlock]:
+        if self.peek().type == "BLOCK_OPEN":
+            name, match, effects = self._parse_rule_block_body()
+            return LayerRuleBlock(name, match, effects, line)
         self.expect("EQUALS")
         values = self.parse_comma_values()
         rule = values[0].strip() if values else ""

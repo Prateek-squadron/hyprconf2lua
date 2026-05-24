@@ -138,11 +138,29 @@ class SubmapDef:
     line: int
 
 
+@dataclass
+class WindowRuleBlock:
+    is_v2: bool
+    name: str
+    match: Dict[str, str]
+    effects: Dict[str, List[str]]
+    line: int
+
+
+@dataclass
+class LayerRuleBlock:
+    name: str
+    match: Dict[str, str]
+    effects: Dict[str, List[str]]
+    line: int
+
+
 BlockStmt = Union[
     Directive, Section, VariableDef, ExecDirective, BindDirective,
     MonitorDirective, WindowRule, AnimationDirective, BezierDirective,
     EnvDirective, SourceDirective, DeviceSection, GestureDirective,
     WorkspaceDirective, LayerRuleDirective, SubmapDef, Comment,
+    WindowRuleBlock, LayerRuleBlock,
 ]
 
 Block = List[BlockStmt]

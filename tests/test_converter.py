@@ -253,6 +253,97 @@ def test_layerrule_conversion():
     assert "hl.layer_rule" in result.lua
 
 
+def test_windowrule_block():
+    src = '''windowrule {
+  name = test-rule
+  float = on
+  match:class = ^(kitty)$
+}
+'''
+    result = convert(src)
+    assert result.success
+    assert "hl.window_rule" in result.lua
+    assert "float = true" in result.lua
+    assert 'class = "^(kitty)$"' in result.lua
+    assert 'name  = "test-rule"' in result.lua
+    assert result.report["flagged"] == 0
+
+
+def test_windowrule_block_multi_value():
+    src = '''windowrule {
+  name = size-rule
+  size = 700 600
+  center = on
+  pin = on
+  match:class = (.*pavucontrol.*)
+}
+'''
+    result = convert(src)
+    assert result.success
+    assert "size = { 700, 600 }" in result.lua
+    assert "center = true" in result.lua
+    assert result.report["flagged"] == 0
+
+
+def test_windowrule_block_nomatch():
+    src = '''windowrule {
+  name = monitor-rule
+  monitor = HDMI-A-1
+  no_initial_focus = on
+  match:class = vesktop
+}
+'''
+    result = convert(src)
+    assert result.success
+    assert "monitor = \"HDMI-A-1\"" in result.lua
+    assert "no_initial_focus = true" in result.lua
+    assert result.report["flagged"] == 0
+
+
+def test_layerrule_block():
+    src = '''layerrule {
+  name = my-layer-rule
+  blur = on
+  ignore_alpha = 0.5
+  match:namespace = swaync-control-center
+}
+'''
+    result = convert(src)
+    assert result.success
+    assert "hl.layer_rule" in result.lua
+    assert "blur = true" in result.lua
+    assert "ignore_alpha = 0.5" in result.lua
+    assert result.report["flagged"] == 0
+
+
+def test_windowrulev2_block():
+    src = '''windowrulev2 {
+  name = v2-rule
+  opacity = 0.9 0.8
+  match:class = (kitty)
+}
+'''
+    result = convert(src)
+    assert result.success
+    assert "hl.window_rule" in result.lua
+    assert "opacity = { 0.9, 0.8 }" in result.lua
+    assert result.report["flagged"] == 0
+
+
+def test_mixed_old_and_block_rules():
+    src = '''windowrule = float, ^(pavucontrol)$
+windowrule {
+  name = new-rule
+  float = on
+  match:class = (firefox)
+}
+'''
+    result = convert(src)
+    assert result.success
+    assert result.lua.count("hl.window_rule") == 2
+    assert result.report["flagged"] == 0
+
+
 def test_workspace_conversion():
     result = convert('workspace = 1, monitor:HDMI-A-1, default:true\n')
     assert result.success
