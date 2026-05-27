@@ -213,6 +213,8 @@ class Parser:
         directive = ":".join(colon_parts)
 
         if directive.startswith("bind"):
+            if self.peek().type == "BLOCK_OPEN":
+                return self.parse_general_directive(directive, t.line)
             return self.parse_bind(directive, t.line)
 
         if directive == "monitor":
@@ -236,7 +238,9 @@ class Parser:
         if directive == "source":
             return self.parse_source(t.line)
         if directive == "gesture":
-            return self.parse_gesture(t.line)
+            if self.peek().type == "BLOCK_OPEN":
+                return self.parse_gesture(t.line)
+            return self.parse_general_directive(directive, t.line)
         if directive == "workspace":
             return self.parse_workspace(t.line)
         if directive == "layerrule":
