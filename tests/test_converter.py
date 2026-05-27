@@ -174,6 +174,15 @@ def test_convert_env_with_semicolon():
     assert "wayland;xcb" in result.lua
 
 
+def test_convert_bind_with_nested_shell_quotes_and_backslashes():
+    src = (
+        "bind = ALT, Print, exec, "
+        "echo '{\"a\": 1}' | jq -r '\"\\(.a),\\(.a) \\(.a)x\\(.a)\"'\n"
+    )
+    result = convert(src)
+    assert result.success
+    assert ".a)" in result.lua
+
 def test_parse_exec():
     config = parse_config("exec-once = waybar\n")
     from hyprconf2lua.ast import ExecDirective

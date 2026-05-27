@@ -297,7 +297,12 @@ class Parser:
         mods_str = values[0].strip()
         key = values[1].strip()
         dispatcher = values[2].strip()
-        params = [v.strip() for v in values[3:]]
+        if dispatcher in ("exec", "execr") and len(values) > 3:
+            # exec payloads can contain commas (e.g. jq filters), so keep the tail as one command.
+            cmd = ",".join(v.strip() for v in values[3:]).strip()
+            params = [cmd] if cmd else []
+        else:
+            params = [v.strip() for v in values[3:]]
         mods = [m.strip() for m in mods_str.replace(",", " ").split()] if mods_str else []
         return BindDirective(mods, key, dispatcher, params, flags, line)
 
