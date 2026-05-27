@@ -159,6 +159,21 @@ def test_parse_env():
     assert config.body[0].name == "XCURSOR_SIZE"
 
 
+def test_parse_env_with_semicolon():
+    config = parse_config("env = QT_QPA_PLATFORM, wayland;xcb  # Set qt platform\n")
+    from hyprconf2lua.ast import EnvDirective
+    assert isinstance(config.body[0], EnvDirective)
+    assert config.body[0].name == "QT_QPA_PLATFORM"
+    assert config.body[0].value == "wayland;xcb"
+
+
+def test_convert_env_with_semicolon():
+    result = convert("env = QT_QPA_PLATFORM, wayland;xcb  # Set qt platform\n")
+    assert result.success
+    assert "QT_QPA_PLATFORM" in result.lua
+    assert "wayland;xcb" in result.lua
+
+
 def test_parse_exec():
     config = parse_config("exec-once = waybar\n")
     from hyprconf2lua.ast import ExecDirective
