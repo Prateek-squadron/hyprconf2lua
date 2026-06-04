@@ -5,15 +5,14 @@
 Hyprland 0.55+ replaced the old hyprlang config with Lua. The old format will be dropped in a future release. **hyprconf2lua** converts your existing config automatically — no manual rewrite needed.
 
 ```bash
-git clone https://github.com/Prateek-squadron/hyprconf2lua.git
-cd hyprconf2lua
-./install.sh
+pip install hyprconf2lua
 hyprconf2lua ~/.config/hypr/hyprland.conf -o hyprland.lua
 ```
 
 That's it. ~97% of your config converts cleanly. The rest gets flagged with `-- TODO` comments telling you exactly what to touch up.
 
-> **Not on PyPI yet** — the `pip install hyprconf2lua` command you might see in older posts doesn't work because the package hasn't been published there. Use the clone+install method above. It's zero-dependency, works on every distro, and sidesteps PEP 668 ("externally managed environment") completely. If your distro blocks pip, this is the way.
+> **PEP 668 ("externally managed environment")?** Use the clone method instead — zero pip needed:
+> `git clone https://github.com/Prateek-squadron/hyprconf2lua.git && cd hyprconf2lua && ./install.sh`
 
 ---
 
@@ -67,32 +66,34 @@ end)
 
 ## Installation
 
-### Quick install (recommended)
+### pip install (recommended)
+
+```bash
+pip install hyprconf2lua           # or: pip install --user hyprconf2lua
+hyprconf2lua ~/.config/hypr/hyprland.conf -o hyprland.lua
+```
+
+### pipx install
+
+```bash
+pipx install hyprconf2lua          # isolated, no PEP 668 issues
+```
+
+### Clone + install (no pip, works everywhere)
 
 ```bash
 git clone https://github.com/Prateek-squadron/hyprconf2lua.git
 cd hyprconf2lua
-./install.sh                    # symlinks hyprconf2lua -> ~/.local/bin
-hyprconf2lua ~/.config/hypr/hyprland.conf -o hyprland.lua
+./install.sh                       # symlinks to ~/.local/bin
 ```
 
-### One-shot (no install)
+### One-shot (no install at all)
 
 ```bash
 git clone https://github.com/Prateek-squadron/hyprconf2lua.git
 cd hyprconf2lua
 PYTHONPATH=src python3 -m hyprconf2lua ~/.config/hypr/hyprland.conf > hyprland.lua
 ```
-
-### pip install (if your distro allows it)
-
-```bash
-pip install --user .
-# or
-pip install --break-system-packages .
-```
-
-> **"externally managed environment" error?** That's PEP 668 — modern distros protect the system Python from pip. Use the clone+install method above instead — zero pip required.
 
 ---
 
