@@ -497,6 +497,37 @@ def test_cli_help():
     assert "Convert" in result.stdout
 
 
+def test_backslash_in_regex():
+    result = convert('bind = , Pause, pass, class:^(com\\.obsproject\\.Studio)$\n')
+    assert result.success
+    assert "Pause" in result.lua or "pass" in result.lua or "obsproject" in result.lua
+
+
+def test_backslash_in_windowrule_class():
+    result = convert('windowrule {\n\tname = godot\n\tmatch:class = ^(org\\.godotengine\\.ProjectManager)$\n\tfloat = on\n}\n')
+    assert result.success
+
+
+def test_bracket_in_windowrule():
+    result = convert('windowrule {\n\tname = smart-gaps\n\tmatch:workspace = w[tv1]s[false]\n\tborder_size = 0\n}\n')
+    assert result.success
+
+
+def test_bracket_in_workspace():
+    result = convert('workspace = w[tv1]s[false], gapsout:0, gapsin:0\n')
+    assert result.success
+
+
+def test_bracket_in_exec_on():
+    result = convert('exec-once = [workspace 1 silent] librewolf\n')
+    assert result.success
+
+
+def test_bracket_in_windowrule_params():
+    result = convert('windowrule = match:class ^(pcmanfm).*, match:title .*([Ee]xecute).*, float on, center on\n')
+    assert result.success
+
+
 if __name__ == "__main__":
     test_lexer_basic()
     test_lexer_comment()
@@ -537,4 +568,10 @@ if __name__ == "__main__":
     test_monitor_extra_fields()
     test_hl_annotation()
     test_no_todo_on_unknown_section()
+    test_backslash_in_regex()
+    test_backslash_in_windowrule_class()
+    test_bracket_in_windowrule()
+    test_bracket_in_workspace()
+    test_bracket_in_exec_on()
+    test_bracket_in_windowrule_params()
     print("All tests passed!")

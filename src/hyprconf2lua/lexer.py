@@ -14,7 +14,7 @@ TOKEN_SPECS = [
     ("COLON",      r":"),
     ("DOLLAR",     r"\$"),
     ("STRING",     r'"([^"\\]|\\.)*"'),
-    ("IDENT",      r'[^\s#"={},:!\[\]\\]+'),
+    ("IDENT",      r'[^\s#"={},:!]+'),
     ("NEWLINE",    r"\n"),
     ("SKIP",       r"[ \t]+"),
     ("MISMATCH",   r"."),
