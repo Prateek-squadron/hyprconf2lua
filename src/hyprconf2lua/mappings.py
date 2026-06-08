@@ -51,6 +51,7 @@ DISPATCHER_MAP = {
     "moveoutofgroup":    ("hl.dsp.window.move", True),
     "focusurgentorlast": ("hl.dsp.focus", True),
     "focusonemonitor":   ("hl.dsp.focus", True),
+    "forcekillactive":   ("hl.dsp.window.kill", False),
 }
 
 BIND_FLAGS_TO_OPTIONS = {

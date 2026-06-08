@@ -302,7 +302,7 @@ class Parser:
             params = [cmd] if cmd else []
         else:
             params = [v.strip() for v in values[3:]]
-        mods = [m.strip() for m in mods_str.replace(",", " ").split()] if mods_str else []
+        mods = [m.strip() for m in mods_str.replace(",", " ").split() if m.strip() and m.strip() != "&"] if mods_str else []
         return BindDirective(mods, key, dispatcher, params, flags, line)
 
     def parse_monitor(self, line: int) -> MonitorDirective:

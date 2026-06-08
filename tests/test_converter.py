@@ -528,6 +528,45 @@ def test_bracket_in_windowrule_params():
     assert result.success
 
 
+def test_forcekillactive_dispatcher():
+    result = convert('bind = SUPER, Q, forcekillactive\n')
+    assert result.success
+    assert "hl.dsp.window.kill" in result.lua
+
+
+def test_ampersand_in_bind_mods():
+    result = convert('bind = $mainMod & SHIFT & A, exec, kitty\n')
+    assert result.success
+    assert "hl.bind" in result.lua
+    assert "&" not in result.lua.split("hl.bind")[-1].split("hl.dsp")[0]
+
+
+def test_ampersand_in_bind_mods_nospace():
+    result = convert('bind = $mainMod&$SHIFT&A, exec, kitty\n')
+    assert result.success
+
+
+def test_device_without_prefix():
+    result = convert('device {\n    name = razer-cobra-pro\n    sensitivity = 0.0\n}\n')
+    assert result.success
+    assert "hl.device" in result.lua
+    assert "razer-cobra-pro" in result.lua
+
+
+def test_gradient_conversion():
+    result = convert('general {\n    col.active_border = rgba(33ccffee) rgba(00ff99ee) 45deg\n}\n')
+    assert result.success
+    assert "colors" in result.lua
+    assert "angle = 45" in result.lua
+
+
+def test_col_dot_prefix_grouped():
+    result = convert('general {\n    col.active_border = rgba(33ccffee) rgba(00ff99ee) 45deg\n    col.inactive_border = rgba(595959aa)\n    gaps_in = 5\n}\n')
+    assert result.success
+    # Both col.* keys should be grouped under one 'col' section
+    assert result.lua.count("col = {") == 1
+
+
 if __name__ == "__main__":
     test_lexer_basic()
     test_lexer_comment()
@@ -574,4 +613,10 @@ if __name__ == "__main__":
     test_bracket_in_workspace()
     test_bracket_in_exec_on()
     test_bracket_in_windowrule_params()
+    test_forcekillactive_dispatcher()
+    test_ampersand_in_bind_mods()
+    test_ampersand_in_bind_mods_nospace()
+    test_device_without_prefix()
+    test_gradient_conversion()
+    test_col_dot_prefix_grouped()
     print("All tests passed!")
