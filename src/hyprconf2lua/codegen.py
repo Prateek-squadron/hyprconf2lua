@@ -506,9 +506,15 @@ class Codegen:
         if dispatcher in DISPATCHER_MAP:
             func, needs_args = DISPATCHER_MAP[dispatcher]
 
+            if dispatcher == "movetoworkspace":
+                params.append(True) # Follow
+                args = self.build_dispatcher_args(params, needs_args, func)
+                return f'{func}({args})'
+
             if dispatcher == "movetoworkspacesilent":
-                args = self.build_dispatcher_args(params, needs_args)
-                return f'{func}({args}, {{ follow = false }})'
+                params.append(False) #Don't Follow
+                args = self.build_dispatcher_args(params, needs_args, func)
+                return f'{func}({args})'
 
             if dispatcher == "movefocus":
                 dir_map = {"l": "left", "r": "right", "u": "up", "d": "down"}
@@ -626,15 +632,17 @@ class Codegen:
         if not params:
             return "" if not needs_args else "nil"
 
-        if len(params) == 1:
+        if len(params) == 1 and (not func or func != "hl.dsp.window.move"):
+            return self.quote(self.resolve_val(params[0]))
+
+        if func and func == "hl.dsp.window.move":
             p = params[0]
-            if func and func == "hl.dsp.window.move":
-                if p.startswith("special"):
-                    return f'{{ workspace = {self.quote(p)} }}'
-                if p.isdigit():
-                    return f'{{ workspace = {p} }}'
-                return f'{{ direction = {self.quote(p)} }}'
-            return self.quote(self.resolve_val(p))
+            follow = params[1]
+            if p.startswith("special"):
+                return f'{{ workspace = {self.quote(p)}{", follow = false " if not follow else " " }}}'
+            if p.isdigit():
+                return f'{{ workspace = {p}{", follow = false " if not follow else " " }}}'
+            return f'{{ direction = {self.quote(p)}{", follow = false " if not follow else " " }}}'
 
         parts = []
         for p in params:

@@ -400,6 +400,16 @@ def test_env_with_comma_value():
     assert result.success
     assert "wayland,x11" in result.lua, f"env with comma value failed: {result.lua}"
 
+def test_bind_movetoworkspace():
+    result = convert("bind = $mainMod SHIFT, 1, movetoworkspace, 1")
+    assert result.success
+    assert "hl.dsp.window.move({ workspace = 1 })" in result.lua
+
+def test_bind_movetoworkspacesilent():
+    result = convert("bind = $mainMod SHIFT, 1, movetoworkspacesilent, 1")
+    assert result.success
+    assert "hl.dsp.window.move({ workspace = 1, follow = false })" in result.lua
+
 
 def test_mouse_bind_movewindow():
     result = convert("bind = SUPER, mouse:272, movewindow\n")
@@ -594,6 +604,8 @@ if __name__ == "__main__":
     test_workspace_conversion()
     test_exec_ordering()
     test_env_with_comma_value()
+    test_bind_movetoworkspace()
+    test_bind_movetoworkspacesilent()
     test_mouse_bind_movewindow()
     test_mouse_bind_resizewindow()
     test_windowrule_with_at_sign()
