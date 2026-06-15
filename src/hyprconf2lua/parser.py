@@ -344,15 +344,42 @@ class Parser:
                         break
                 key = ":".join(key_parts)
 
-                self.expect("EQUALS")
-                val = self.parse_value_rest()
-
-                if key == "name":
-                    name = val
-                elif key.startswith("match:"):
-                    match[key[len("match:"):]] = val
+                if key == "match" and self.peek().type == "BLOCK_OPEN":
+                    self.advance()
+                    self.skip_newlines()
+                    while self.peek().type not in ("BLOCK_CLOSE", "EOF"):
+                        t2 = self.peek()
+                        if t2.type == "COMMENT":
+                            self.advance()
+                        elif t2.type == "IDENT":
+                            mk_parts = [self.advance().value]
+                            while self.peek().type == "COLON":
+                                self.advance()
+                                if self.peek().type == "IDENT":
+                                    mk_parts.append(self.advance().value)
+                                else:
+                                    break
+                            mk_key = ":".join(mk_parts)
+                            self.expect("EQUALS")
+                            mk_val = self.parse_value_rest()
+                            if mk_key.startswith("match:"):
+                                match[mk_key[len("match:"):]] = mk_val
+                            else:
+                                match[mk_key] = mk_val
+                        else:
+                            self.advance()
+                        self.skip_newlines()
+                    self.expect("BLOCK_CLOSE")
                 else:
-                    effects[key] = [val]
+                    self.expect("EQUALS")
+                    val = self.parse_value_rest()
+
+                    if key == "name":
+                        name = val
+                    elif key.startswith("match:"):
+                        match[key[len("match:"):]] = val
+                    else:
+                        effects[key] = [val]
             else:
                 self.advance()
             self.skip_newlines()

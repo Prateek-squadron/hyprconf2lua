@@ -563,8 +563,40 @@ def test_gradient_conversion():
 def test_col_dot_prefix_grouped():
     result = convert('general {\n    col.active_border = rgba(33ccffee) rgba(00ff99ee) 45deg\n    col.inactive_border = rgba(595959aa)\n    gaps_in = 5\n}\n')
     assert result.success
-    # Both col.* keys should be grouped under one 'col' section
     assert result.lua.count("col = {") == 1
+
+
+def test_match_block_in_windowrule():
+    result = convert('windowrule {\n  name = my-rule\n  float = on\n  match {\n    class = .*\n    title = my-window\n  }\n}\n')
+    assert result.success
+    assert "class = \".*\"" in result.lua
+    assert "title = \"my-window\"" in result.lua
+    assert "float = true" in result.lua
+
+
+def test_match_block_in_windowrulev2():
+    result = convert('windowrulev2 {\n  name = v2-match\n  opacity = 0.9 0.8\n  match {\n    class = (kitty)\n  }\n}\n')
+    assert result.success
+    assert "class = \"(kitty)\"" in result.lua
+    assert "opacity = { 0.9, 0.8 }" in result.lua
+
+
+def test_match_block_in_layerrule():
+    result = convert('layerrule {\n  name = my-layer\n  blur = true\n  match {\n    namespace = rofi\n  }\n}\n')
+    assert result.success
+    assert "namespace" in result.lua
+
+
+def test_movetoworkspace_conversion():
+    result = convert('bind = $mainMod SHIFT, 1, movetoworkspace, 1\n')
+    assert result.success
+    assert "workspace = 1" in result.lua
+
+
+def test_movetoworkspacesilent_conversion():
+    result = convert('bind = $mainMod SHIFT, 1, movetoworkspacesilent, 1\n')
+    assert result.success
+    assert "workspace = 1" in result.lua
 
 
 if __name__ == "__main__":
@@ -619,4 +651,9 @@ if __name__ == "__main__":
     test_device_without_prefix()
     test_gradient_conversion()
     test_col_dot_prefix_grouped()
+    test_match_block_in_windowrule()
+    test_match_block_in_windowrulev2()
+    test_match_block_in_layerrule()
+    test_movetoworkspace_conversion()
+    test_movetoworkspacesilent_conversion()
     print("All tests passed!")
