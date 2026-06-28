@@ -88,14 +88,11 @@ def test_lexer_variable():
 
 
 def test_lexer_error():
+    from hyprconf2lua.lexer import LexerError
     import pytest
-    try:
-        from hyprconf2lua.lexer import LexerError
-    except ImportError:
-        pytest.skip("need pytest")
 
     with pytest.raises(LexerError):
-        tokenize("key = value `bad`")
+        tokenize("key = value !bad")
 
 
 def test_parse_variable():
@@ -599,61 +596,67 @@ def test_movetoworkspacesilent_conversion():
     assert "workspace = 1" in result.lua
 
 
-if __name__ == "__main__":
-    test_lexer_basic()
-    test_lexer_comment()
-    test_lexer_section()
-    test_lexer_variable()
-    test_parse_variable()
-    test_parse_section()
-    test_parse_bind()
-    test_parse_monitor()
-    test_parse_windowrule()
-    test_parse_windowrulev2()
-    test_parse_env()
-    test_parse_exec()
-    test_parse_device()
-    test_full_conversion()
-    test_conversion_report()
-    test_empty_config()
-    test_comment_only()
-    test_variable_reference()
-    test_multiple_monitors()
-    test_bezier_conversion()
-    test_bind_with_flags()
-    test_bindm_conversion()
-    test_layerrule_conversion()
-    test_workspace_conversion()
-    test_exec_ordering()
-    test_env_with_comma_value()
-    test_mouse_bind_movewindow()
-    test_mouse_bind_resizewindow()
-    test_windowrule_with_at_sign()
-    test_submap_conversion()
-    test_plugin_section()
-    test_plugin_subsections()
-    test_unbind_conversion()
-    test_unknown_section_autoconvert()
-    test_colon_separated_nested_key()
-    test_colon_two_level_key()
-    test_monitor_extra_fields()
-    test_hl_annotation()
-    test_no_todo_on_unknown_section()
-    test_backslash_in_regex()
-    test_backslash_in_windowrule_class()
-    test_bracket_in_windowrule()
-    test_bracket_in_workspace()
-    test_bracket_in_exec_on()
-    test_bracket_in_windowrule_params()
-    test_forcekillactive_dispatcher()
-    test_ampersand_in_bind_mods()
-    test_ampersand_in_bind_mods_nospace()
-    test_device_without_prefix()
-    test_gradient_conversion()
-    test_col_dot_prefix_grouped()
-    test_match_block_in_windowrule()
-    test_match_block_in_windowrulev2()
-    test_match_block_in_layerrule()
-    test_movetoworkspace_conversion()
-    test_movetoworkspacesilent_conversion()
-    print("All tests passed!")
+def test_single_line_section():
+    result = convert('general { gaps_in = 5 }\n')
+    assert result.success
+    assert "hl.config" in result.lua
+    assert "gaps_in = 5" in result.lua
+
+
+def test_empty_file():
+    result = convert("")
+    assert result.success
+
+
+def test_whitespace_only():
+    result = convert("   \n  \n  \n")
+    assert result.success
+
+
+def test_tab_indentation():
+    result = convert("general {\n\tgaps_in = 5\n}\n")
+    assert result.success
+    assert "gaps_in = 5" in result.lua
+
+
+def test_bind_no_params():
+    result = convert("bind = SUPER, Q, exec\n")
+    assert result.success
+
+
+def test_unbind_no_args():
+    result = convert("unbind = ,\n")
+    assert result.success
+
+
+def test_exec_shutdown():
+    result = convert("exec-shutdown = killall waybar\n")
+    assert result.success
+    assert "hl.on" in result.lua or "exec_shutdown" in result.lua
+
+
+def test_gesture_multiple():
+    result = convert("gesture {\n    workspace_swipe = true\n    workspace_swipe_fingers = 3\n}\n")
+    assert result.success
+    assert "hl.gesture" in result.lua
+    assert "swipe fingers" in result.lua
+
+
+def test_moveintogroup_dispatcher():
+    result = convert("bind = SUPER, T, moveintogroup, l\n")
+    assert result.success
+    assert "into_group" in result.lua
+    assert '"left"' in result.lua
+
+
+def test_moveoutofgroup_dispatcher():
+    result = convert("bind = SUPER, T, moveoutofgroup\n")
+    assert result.success
+    assert "out_of_group" in result.lua
+
+
+def test_nested_subsection_in_decoration():
+    result = convert("decoration {\n    blur {\n        size = 3\n        passes = 2\n    }\n}\n")
+    assert result.success
+    assert "blur" in result.lua
+    assert "size = 3" in result.lua

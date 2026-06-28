@@ -172,6 +172,23 @@ class Parser:
         current = []
         while self.peek().type not in ("NEWLINE", "EOF") and \
               self.peek().type != "COMMENT":
+            if self.peek().type == "BLOCK_CLOSE":
+                break
+            if self.peek().type == "BLOCK_OPEN":
+                self.advance()
+                current.append("{")
+                depth = 1
+                while depth > 0 and self.peek().type not in ("EOF", "NEWLINE"):
+                    t = self.advance()
+                    if t.type == "BLOCK_OPEN":
+                        depth += 1
+                    elif t.type == "BLOCK_CLOSE":
+                        depth -= 1
+                    if depth > 0:
+                        current.append(t.value)
+                if depth == 0:
+                    current.append("}")
+                continue
             if self.peek().type == "COMMA":
                 self.advance()
                 values.append(self._join_tokens(current))

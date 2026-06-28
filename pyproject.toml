@@ -23,6 +23,9 @@ classifiers = [
     "Topic :: Utilities",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest"]
+
 [project.urls]
 Homepage = "https://github.com/Prateek-squadron/hyprconf2lua"
 Repository = "https://github.com/Prateek-squadron/hyprconf2lua"

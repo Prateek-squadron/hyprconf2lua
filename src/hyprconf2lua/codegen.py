@@ -550,6 +550,16 @@ class Codegen:
                     return f'{func}({{ forward = false }})'
                 return f'{func}({{ forward = true }})'
 
+            if dispatcher == "moveintogroup":
+                if params:
+                    dir_map = {"l": "left", "r": "right", "u": "up", "d": "down"}
+                    d = dir_map.get(params[0], params[0])
+                    return f'{func}({{ into_group = "{d}" }})'
+                return None
+
+            if dispatcher == "moveoutofgroup":
+                return f'{func}({{ out_of_group = true }})'
+
             if dispatcher == "workspace":
                 return self.build_workspace_dispatcher(func, params)
 
@@ -565,12 +575,6 @@ class Codegen:
             if dispatcher == "focusonemonitor":
                 return f'{func}({{ on_monitor = true }})'
 
-            if dispatcher == "mouse":
-                mouse_actions = {"272": "drag", "273": "resize"}
-                if params and params[0] in mouse_actions:
-                    return f'hl.dsp.window.{mouse_actions[params[0]]}()'
-                return None
-
             if dispatcher in ("exec", "execr"):
                 resolved = self.resolve_val(params[0]) if params else ""
                 return f'{func}({self.quote(resolved)})'
@@ -583,16 +587,6 @@ class Codegen:
             if params and params[0] in mouse_actions:
                 return f'hl.dsp.window.{mouse_actions[params[0]]}()'
             return None
-
-        if dispatcher in ("moveintogroup",):
-            if params:
-                dir_map = {"l": "left", "r": "right", "u": "up", "d": "down"}
-                d = dir_map.get(params[0], params[0])
-                return f'hl.dsp.window.move({{ into_group = "{d}" }})'
-            return None
-
-        elif dispatcher in ("moveoutofgroup",):
-            return f'hl.dsp.window.move({{ out_of_group = true }})'
 
         return None
 
@@ -835,7 +829,6 @@ class Codegen:
             return
 
         self.emit(f'-- source = {path} -> requires manual conversion')
-        home_relative = path.replace("~", "").replace(os_path := "", ".hypr/")
 
         import os as _os
         just_name = _os.path.splitext(_os.path.basename(path))[0]
