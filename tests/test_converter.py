@@ -674,3 +674,13 @@ def test_windowrule_match_class_with_equals():
     assert result.success
     assert "class = \"^(T)$\"" in result.lua
     assert "workspace = \"special:T silent\"" in result.lua
+
+
+def test_windowrule_match_class_complex():
+    result = convert("windowrule = workspace special:T silent, match:class ^foo=bar$\n")
+    assert result.success
+    assert "class = \"^foo=bar$\"" in result.lua
+
+    result2 = convert("windowrule = workspace special:T silent, match:class:^(T)$\n")
+    assert result2.success
+    assert "class = \"^(T)$\"" in result2.lua

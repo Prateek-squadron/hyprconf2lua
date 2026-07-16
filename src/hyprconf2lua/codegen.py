@@ -664,12 +664,9 @@ class Codegen:
         for mp in match_params:
             if mp.startswith("match:"):
                 rest = mp[len("match:"):].strip()
-                if "=" in rest:
-                    match_key, value = rest.split("=", 1)
-                    match_key = match_key.strip()
-                    value = value.strip()
-                elif " " in rest:
-                    match_key, value = rest.split(None, 1)
+                m = re.match(r'^([a-zA-Z0-9_-]+)(?:\s*=\s*|\s*:\s*|\s+)(.*)$', rest)
+                if m:
+                    match_key, value = m.groups()
                 else:
                     match_key = rest
                     value = "true"
