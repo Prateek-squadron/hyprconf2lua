@@ -664,10 +664,12 @@ class Codegen:
         for mp in match_params:
             if mp.startswith("match:"):
                 rest = mp[len("match:"):].strip()
-                if " " in rest:
-                    match_key, value = rest.split(None, 1)
-                elif "=" in rest:
+                if "=" in rest:
                     match_key, value = rest.split("=", 1)
+                    match_key = match_key.strip()
+                    value = value.strip()
+                elif " " in rest:
+                    match_key, value = rest.split(None, 1)
                 else:
                     match_key = rest
                     value = "true"
