@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import re
 from typing import Dict, List, Optional
 
@@ -118,6 +119,28 @@ class Codegen:
             return "local_var_" + var_name
         return re.sub(r'\$(\w+)', _repl, val)
 
+    def resolve_val_with_env(self, val: str) -> str:
+        def _repl(m: re.Match) -> str:
+            var_name = m.group(1)
+            if var_name in self.variables:
+                return self.variables[var_name]
+            if var_name in os.environ:
+                return f'os.getenv("{var_name}")'
+            return "local_var_" + var_name
+        return re.sub(r'\$(\w+)', _repl, val)
+
+    def _build_concat_expr(self, val: str) -> str:
+        parts = re.split(r'(os\.getenv\([^)]+\))', val)
+        expr_parts = []
+        for part in parts:
+            if part.startswith("os.getenv("):
+                expr_parts.append(part)
+            elif part:
+                expr_parts.append(self.quote(part))
+        if not expr_parts:
+            return '""'
+        return " .. ".join(expr_parts)
+
     def needs_quotes(self, val: str) -> bool:
         if not val:
             return True
@@ -139,10 +162,16 @@ class Codegen:
             return f'"{escaped}"'
         return val
 
+    @staticmethod
+    def _normalize_key(key: str) -> str:
+        return key.replace("-", "_")
+
     def to_lua_val(self, val: str):
-        val = self.resolve_val(val)
+        val = self.resolve_val_with_env(val)
         if val.startswith("local_var_"):
             return val[len("local_var_"):]
+        if "os.getenv(" in val:
+            return self._build_concat_expr(val)
         if val.lower() in ("true", "on", "yes"):
             return "true"
         if val.lower() in ("false", "off", "no"):
@@ -160,7 +189,7 @@ class Codegen:
         return self.quote(val)
 
     def visit_variable(self, stmt: VariableDef):
-        val = self.resolve_val(stmt.value)
+        val = self.resolve_val_with_env(stmt.value)
         self.variables[stmt.name] = val
         self.translated_count += 1
         if stmt.name.upper() == "MAINMOD" or stmt.name == "mainMod":
@@ -179,17 +208,21 @@ class Codegen:
                     self.main_mod_var = name
                     break
 
+    def _exec_lua_expr(self, cmd: str) -> str:
+        resolved = self.resolve_val_with_env(cmd)
+        if resolved.startswith("$") and resolved[1:] in self.variables:
+            return resolved[1:]
+        if "os.getenv(" in resolved:
+            return self._build_concat_expr(resolved)
+        return self.quote(resolved)
+
     def emit_pending_execs(self):
         if self.pending_exec_ones:
             self.emit("-- Autostart")
             self.emit('hl.on("hyprland.start", function()')
             self.indent()
             for cmd in self.pending_exec_ones:
-                resolved = self.resolve_val(cmd)
-                if resolved.startswith("$") and resolved[1:] in self.variables:
-                    self.emit(f"hl.exec_cmd({resolved[1:]})")
-                else:
-                    self.emit(f"hl.exec_cmd({self.quote(resolved)})")
+                self.emit(f"hl.exec_cmd({self._exec_lua_expr(cmd)})")
             self.dedent()
             self.emit("end)")
             self.emit("")
@@ -199,11 +232,7 @@ class Codegen:
             self.emit('hl.on("config.reloaded", function()')
             self.indent()
             for cmd in self.pending_execs:
-                resolved = self.resolve_val(cmd)
-                if resolved.startswith("$") and resolved[1:] in self.variables:
-                    self.emit(f"hl.exec_cmd({resolved[1:]})")
-                else:
-                    self.emit(f"hl.exec_cmd({self.quote(resolved)})")
+                self.emit(f"hl.exec_cmd({self._exec_lua_expr(cmd)})")
             self.dedent()
             self.emit("end)")
             self.emit("")
@@ -213,11 +242,7 @@ class Codegen:
             self.emit('hl.on("hyprland.shutdown", function()')
             self.indent()
             for cmd in self.pending_exec_shutdowns:
-                resolved = self.resolve_val(cmd)
-                if resolved.startswith("$") and resolved[1:] in self.variables:
-                    self.emit(f"hl.exec_cmd({resolved[1:]})")
-                else:
-                    self.emit(f"hl.exec_cmd({self.quote(resolved)})")
+                self.emit(f"hl.exec_cmd({self._exec_lua_expr(cmd)})")
             self.dedent()
             self.emit("end)")
             self.emit("")
@@ -242,6 +267,7 @@ class Codegen:
         return f"{{ colors = {{ {', '.join(colors)} }}, angle = {angle} }}"
 
     def _emit_directive(self, key: str, values: List[str]):
+        key = self._normalize_key(key)
         if len(values) == 1 and self._is_gradient(values[0]):
             self.translated_count += 1
             self.emit(f"{key} = {self._format_gradient(values[0])},")
@@ -295,7 +321,7 @@ class Codegen:
                         self.emit(f"-- Nested subsection {sd.name}:")
                         for ssd in sd.body:
                             if isinstance(ssd, Directive):
-                                k = ssd.key
+                                k = self._normalize_key(ssd.key)
                                 vv = self.to_lua_val(ssd.value[0]) if ssd.value else "true"
                                 self.emit(f"{k} = {vv},")
                 self.dedent()
@@ -314,7 +340,7 @@ class Codegen:
         self.emit(f"{name} = {{")
         self.indent()
         for d in directives:
-            key = d.key
+            key = self._normalize_key(d.key)
             if len(d.value) == 1:
                 val = self.to_lua_val(d.value[0])
                 self.emit(f"{key} = {val},")
@@ -576,7 +602,10 @@ class Codegen:
                 return f'{func}({{ on_monitor = true }})'
 
             if dispatcher in ("exec", "execr"):
-                resolved = self.resolve_val(params[0]) if params else ""
+                raw = params[0] if params else ""
+                resolved = self.resolve_val_with_env(raw)
+                if "os.getenv(" in resolved:
+                    return f'{func}({self._build_concat_expr(resolved)})'
                 return f'{func}({self.quote(resolved)})'
 
             args = self.build_dispatcher_args(params, needs_args, func)
@@ -731,11 +760,12 @@ class Codegen:
             self.emit("match = {")
             self.indent()
             for k, v in stmt.match.items():
-                self.emit(f"{k} = {self.quote(v)},")
+                self.emit(f"{self._normalize_key(k)} = {self.quote(v)},")
             self.dedent()
             self.emit("},")
 
         for key, vals in stmt.effects.items():
+            key = self._normalize_key(key)
             if len(vals) == 1:
                 parts = vals[0].split()
                 if len(parts) == 1:
@@ -809,10 +839,9 @@ class Codegen:
     def visit_env(self, stmt: EnvDirective):
         self.translated_count += 1
         resolved_name = self.resolve_val(stmt.name)
-        resolved_val = self.resolve_val(stmt.value)
         name_q = self.quote(resolved_name)
-        val_q = self.quote(resolved_val)
-        self.emit(f"hl.env({name_q}, {val_q})")
+        val_expr = self.to_lua_val(stmt.value)
+        self.emit(f"hl.env({name_q}, {val_expr})")
 
     def visit_source(self, stmt: SourceDirective):
         self.passthrough_count += 1
@@ -842,7 +871,7 @@ class Codegen:
         self.emit(f'name = {self.quote(stmt.name)},')
         for d in stmt.body:
             if isinstance(d, Directive):
-                key = d.key
+                key = self._normalize_key(d.key)
                 val = self.to_lua_val(d.value[0]) if d.value else "true"
                 self.emit(f"{key} = {val},")
         self.dedent()
@@ -937,11 +966,12 @@ class Codegen:
             self.emit("match = {")
             self.indent()
             for k, v in stmt.match.items():
-                self.emit(f"{k} = {self.quote(v)},")
+                self.emit(f"{self._normalize_key(k)} = {self.quote(v)},")
             self.dedent()
             self.emit("},")
 
         for key, vals in stmt.effects.items():
+            key = self._normalize_key(key)
             if len(vals) == 1:
                 parts = vals[0].split()
                 if len(parts) == 1:

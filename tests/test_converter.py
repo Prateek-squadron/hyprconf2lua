@@ -660,3 +660,24 @@ def test_nested_subsection_in_decoration():
     assert result.success
     assert "blur" in result.lua
     assert "size = 3" in result.lua
+
+
+def test_env_var_resolution():
+    result = convert('env = AQ_DRM_DEVICES,$HOME/.config/hypr/cards/intelcard:$HOME/.config/hypr/cards/nvidiacard\n')
+    assert result.success
+    assert 'os.getenv("HOME")' in result.lua
+    assert "local_var_HOME" not in result.lua
+
+
+def test_hyphen_to_underscore_in_device():
+    result = convert('device {\n    name = touchpad\n    tap-to-click = true\n}\n')
+    assert result.success
+    assert "tap_to_click" in result.lua
+    assert "tap-to-click" not in result.lua
+
+
+def test_hyphen_to_underscore_in_general():
+    result = convert('general {\n    no-cursor = true\n}\n')
+    assert result.success
+    assert "no_cursor" in result.lua
+    assert "no-cursor" not in result.lua
