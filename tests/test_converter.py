@@ -348,7 +348,7 @@ def test_windowrulev2_block():
     result = convert(src)
     assert result.success
     assert "hl.window_rule" in result.lua
-    assert "opacity = { 0.9, 0.8 }" in result.lua
+    assert "opacity = \"0.9 0.8\"" in result.lua
     assert result.report["flagged"] == 0
 
 
@@ -575,7 +575,7 @@ def test_match_block_in_windowrulev2():
     result = convert('windowrulev2 {\n  name = v2-match\n  opacity = 0.9 0.8\n  match {\n    class = (kitty)\n  }\n}\n')
     assert result.success
     assert "class = \"(kitty)\"" in result.lua
-    assert "opacity = { 0.9, 0.8 }" in result.lua
+    assert "opacity = \"0.9 0.8\"" in result.lua
 
 
 def test_match_block_in_layerrule():

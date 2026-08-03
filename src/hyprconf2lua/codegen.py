@@ -16,6 +16,8 @@ KNOWN_SECTIONS = {
     "autostart", "window", "monitor", "workspace", "layer",
 }
 
+RAW_STRING_EFFECT_KEYS = {"opacity"}
+
 
 class Codegen:
     def __init__(self):
@@ -799,6 +801,9 @@ class Codegen:
             if not vals or not vals[0].strip():
                 continue
             if len(vals) == 1:
+                if key  in RAW_STRING_EFFECT_KEYS:
+                    self.emit(f"{key} = {self.to_lua_val(vals[0])},")
+                    continue
                 parts = vals[0].split()
                 if len(parts) == 1:
                     self.emit(f"{key} = {self.to_lua_val(parts[0])},")
