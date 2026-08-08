@@ -487,8 +487,14 @@ class Parser:
             elif t.type == "IDENT":
                 key_t = self.advance()
                 self.expect("EQUALS")
-                val = self.parse_value_rest()
-                body.append(Directive(key_t.value, [val], key_t.line, 0))
+                # The "gesture" sub-key takes comma-separated values (fingers, dir, action)
+                if key_t.value == "gesture":
+                    values = self.parse_comma_values()
+                    joined = ", ".join(v.strip() for v in values)
+                    body.append(Directive(key_t.value, [joined], key_t.line, 0))
+                else:
+                    val = self.parse_value_rest()
+                    body.append(Directive(key_t.value, [val], key_t.line, 0))
             else:
                 self.advance()
             self.skip_newlines()

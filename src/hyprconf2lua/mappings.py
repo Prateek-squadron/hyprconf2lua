@@ -20,6 +20,7 @@ DISPATCHER_MAP = {
     "swapnext":          ("hl.dsp.window.swap", True),
     "centerwindow":      ("hl.dsp.window.center", False),
     "resizewindow":      ("hl.dsp.window.resize", True),
+    "resizeactive":      ("hl.dsp.window.resize", True),
     "movecursor":        ("hl.dsp.cursor.move", True),
     "pin":               ("hl.dsp.window.pin", False),
     "tag":               ("hl.dsp.window.tag", True),

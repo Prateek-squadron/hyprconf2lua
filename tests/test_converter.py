@@ -757,3 +757,84 @@ def test_multiline_exec_continuation():
     assert '\\"$(slurp)\\"' in result.lua
     assert "$FILE" in result.lua
     assert "local_var_FILE" not in result.lua
+
+
+def windowrulev2_match_not_inverted():
+    src = 'windowrulev2 = float, class:^(pavucontrol)$\n'
+    result = convert(src)
+    assert result.success
+    assert 'class = "^(pavucontrol)$"' in result.lua
+    assert 'float = true' in result.lua
+    assert 'TODO' not in result.lua
+
+
+def layer_rule_blur_on_syntax():
+    src = 'layerrule = blur, ^(swaylock)$\n'
+    result = convert(src)
+    assert result.success
+    assert 'blur = true' in result.lua
+    # No invalid key with equals sign in identifier
+    assert 'blur=on' not in result.lua
+
+
+def layer_rule_namespace_prefix_stripped():
+    src = 'layerrule = blur, match:namespace ^(swaylock)$\n'
+    result = convert(src)
+    assert result.success
+    assert 'namespace = "^(swaylock)$"' in result.lua
+    assert 'match:namespace' not in result.lua
+
+
+def gesture_definition_as_separate_call():
+    src = 'gesture {\n    gesture = 3, horizontal, workspace\n    workspace_swipe_invert = true\n}\n'
+    result = convert(src)
+    assert result.success
+    # The swipe gesture should be a dedicated hl.gesture({ fingers=..., ... }) call
+    assert 'fingers = 3' in result.lua
+    assert 'direction = "horizontal"' in result.lua
+    assert 'action = "workspace"' in result.lua
+    # Workspace swipe invert stays as config property
+    assert 'workspace swipe invert' in result.lua
+
+
+def movewindow_direction_key():
+    for letter, name in [('l', 'left'), ('r', 'right'), ('u', 'up'), ('d', 'down')]:
+        src = f'bind = SUPER SHIFT, {letter.upper()}, movewindow, {letter}\n'
+        result = convert(src)
+        assert result.success, f"Failed for direction {letter}"
+        assert f'direction = "{name}"' in result.lua, f"Missing direction for {letter}"
+        assert 'hl.dsp.window.move' in result.lua
+
+
+def resizeactive_relative_resize():
+    src = 'bind = SUPER SHIFT, h, resizeactive, -40 0\n'
+    result = convert(src)
+    assert result.success
+    assert 'hl.dsp.window.resize' in result.lua
+    assert 'x = -40' in result.lua
+    assert 'y = 0' in result.lua
+    assert 'relative = true' in result.lua
+    assert 'TODO' not in result.lua
+
+
+def movewindow_workspace_plus_zero():
+    src = 'bind = SUPER, W, movewindow, +0\n'
+    result = convert(src)
+    assert result.success
+    assert 'workspace = "+0"' in result.lua
+    assert 'direction' not in result.lua
+
+
+def layoutmsg_nil_becomes_togglesplit():
+    src = 'bind = SUPER, J, layoutmsg,\n'
+    result = convert(src)
+    assert result.success
+    assert 'hl.dsp.layout("togglesplit")' in result.lua
+    assert 'nil' not in result.lua
+
+
+def opacity_multivalue_array():
+    src = 'windowrulev2 = opacity 0.8 0.8, class:^(kitty)$\n'
+    result = convert(src)
+    assert result.success
+    assert 'opacity = { 0.8, 0.8 }' in result.lua

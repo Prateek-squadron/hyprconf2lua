@@ -570,6 +570,17 @@ class Codegen:
                     return f'{func}({{ into_group = {self.quote(params[0][len("into_group:"):])} }})'
                 if params and params[0] == "out_of_group":
                     return f'{func}({{ out_of_group = true }})'
+                if params:
+                    p = params[0]
+                    dir_map = {"l": "left", "r": "right", "u": "up", "d": "down"}
+                    if p in dir_map:
+                        return f'{func}({{ direction = "{dir_map[p]}" }})'
+                    # Relative workspace move e.g. +0 means "back here"
+                    if re.match(r'^[+-]\d+$', p) or p.lstrip('-').lstrip('+').isdigit():
+                        return f'{func}({{ workspace = {self.quote(p)} }})'
+                    # monitor move
+                    if p.startswith("mon:") or p in ("HDMI-A-1", "eDP-1", "DP-1", "HDMI-A-2"):
+                        return f'{func}({{ monitor = {self.quote(p)} }})'
                 return self.build_dispatcher_args(params, needs_args, func)
 
             if dispatcher == "swapwindow":
@@ -621,6 +632,25 @@ class Codegen:
                 if "os.getenv(" in resolved:
                     return f'{func}({self._build_concat_expr(resolved)})'
                 return f'{func}({self.quote(resolved)})'
+
+            if dispatcher in ("layoutmsg", "togglesplit"):
+                # layoutmsg with no meaningful param should default to "togglesplit"
+                if not params or not params[0].strip() or params[0].strip().startswith("#"):
+                    return f'{func}("togglesplit")'
+                return f'{func}({self.quote(params[0])})'
+
+            if dispatcher == "resizeactive":
+                # Parse "X Y" into relative resize args
+                if params:
+                    parts = params[0].split()
+                    if len(parts) == 2:
+                        try:
+                            x = int(parts[0])
+                            y = int(parts[1])
+                            return f'{func}({{ x = {x}, y = {y}, relative = true }})'
+                        except ValueError:
+                            pass
+                return f'{func}({{ relative = true }})'
 
             args = self.build_dispatcher_args(params, needs_args, func)
             return f'{func}({args})' if needs_args else f'{func}()'
@@ -702,7 +732,6 @@ class Codegen:
         match_params = stmt.match_params
 
         match = {}
-        effects = {}
 
         for mp in match_params:
             if mp.startswith("match:"):
@@ -725,14 +754,20 @@ class Codegen:
             if colon_idx > 0:
                 prefix = mp[:colon_idx].strip()
                 value = mp[colon_idx + 1:].strip()
-                match_key = prefix
-                if value.lower() == "true":
-                    match[match_key] = "true"
-                elif value.lower() == "false":
-                    match[match_key] = "false"
-                else:
-                    match[match_key] = self.quote(value)
+                # Treat known match predicates as match keys, not rules
+                if prefix.lower() in ("class", "title", "xclass", "xtitle", "tag",
+                                       "initialclass", "initialtitle", "floating",
+                                       "fullscreen", "pinned", "workspace", "address"):
+                    match_key = prefix
+                    if value.lower() == "true":
+                        match[match_key] = "true"
+                    elif value.lower() == "false":
+                        match[match_key] = "false"
+                    else:
+                        match[match_key] = self.quote(value)
+                    continue
 
+        # Legacy windowrule (non-v2): first non-match param is the class regex
         if not match and not stmt.is_v2:
             if match_params:
                 class_val = match_params[0]
@@ -760,11 +795,21 @@ class Codegen:
             applied = True
         else:
             parts = rule.split(None, 1)
-            if parts and parts[0] in WINDOW_RULE_PARAM_MAP:
-                k, needs_val = WINDOW_RULE_PARAM_MAP[parts[0]]
+            if parts and parts[0].lower() in WINDOW_RULE_PARAM_MAP:
+                k, needs_val = WINDOW_RULE_PARAM_MAP[parts[0].lower()]
                 if needs_val and len(parts) > 1:
-                    val = self.to_lua_val(parts[1])
-                    self.emit(f"{k} = {val},")
+                    raw_val = parts[1].strip()
+                    sub = raw_val.split()
+                    # Only split into Lua array when all tokens are numeric/coordinate-like
+                    # (e.g. "0.8 0.8" or "100%-433 53"). String values (workspace names, etc.)
+                    # stay as a single quoted string.
+                    _num_re = re.compile(r'^-?\d+([.]\d+)?(%[+-]?\d+)?$')
+                    all_numeric = len(sub) > 1 and all(_num_re.match(t) for t in sub)
+                    if all_numeric:
+                        lua_parts = [self.to_lua_val(p) for p in sub]
+                        self.emit(f"{k} = {{ {', '.join(lua_parts)} }},")
+                    else:
+                        self.emit(f"{k} = {self.to_lua_val(raw_val)},")
                 elif needs_val:
                     self.emit(f"{k} = true,")
                 else:
@@ -921,19 +966,44 @@ class Codegen:
 
     def visit_gesture(self, stmt: GestureDirective):
         self.translated_count += 1
-        props = {}
-        for d in stmt.body:
-            if isinstance(d, Directive):
-                props[d.key] = d.value[0] if d.value else "true"
+        config_props = {}   # goes into hl.config({ gestures = { ... } })
+        gesture_calls = []  # goes into separate hl.gesture({ fingers=..., direction=..., action=... })
 
-        self.emit("hl.gesture({")
-        self.indent()
-        for k, v in props.items():
-            lua_v = self.to_lua_val(v)
-            lua_k = k.replace("_", " ")
-            self.emit(f"[{self.quote(lua_k)}] = {lua_v},")
-        self.dedent()
-        self.emit("})")
+        for d in stmt.body:
+            if not isinstance(d, Directive):
+                continue
+            # A "gesture" key inside the gesture block is a swipe gesture definition
+            # with comma-separated values: fingers, direction, action
+            if d.key == "gesture":
+                values = [v.strip() for v in (d.value[0].split(",") if d.value else [])]
+                if len(values) >= 3:
+                    fingers, direction, action = values[0], values[1], values[2]
+                    gesture_calls.append((fingers, direction, action))
+                elif len(values) == 2:
+                    fingers, direction = values[0], values[1]
+                    gesture_calls.append((fingers, direction, ""))
+            else:
+                config_props[d.key] = d.value[0] if d.value else "true"
+
+        if config_props:
+            self.emit("hl.gesture({")
+            self.indent()
+            for k, v in config_props.items():
+                lua_v = self.to_lua_val(v)
+                lua_k = k.replace("_", " ")
+                self.emit(f"[{self.quote(lua_k)}] = {lua_v},")
+            self.dedent()
+            self.emit("})")    
+
+        for fingers, direction, action in gesture_calls:
+            self.emit("hl.gesture({")
+            self.indent()
+            self.emit(f"fingers = {self.to_lua_val(fingers)},")
+            self.emit(f"direction = {self.quote(direction)},")
+            if action:
+                self.emit(f"action = {self.quote(action)},")
+            self.dedent()
+            self.emit("})")    
 
     def visit_submap(self, stmt: SubmapDef):
         self.translated_count += 1
@@ -972,8 +1042,15 @@ class Codegen:
 
     def visit_layerrule(self, stmt: LayerRuleDirective):
         self.translated_count += 1
-        rule_lower = stmt.rule.lower()
+        rule = stmt.rule
+        rule_lower = rule.lower().strip()
         ns = stmt.namespace
+
+        # Strip leading match:namespace / namespace: prefixes from namespace value
+        if ns.lower().startswith("match:namespace"):
+            ns = re.sub(r'^match:namespace\s*[=:]?\s*', '', ns, flags=re.IGNORECASE).strip()
+        elif ns.lower().startswith("namespace:"):
+            ns = ns[len("namespace:"):].strip()
 
         self.emit("hl.layer_rule({")
         self.indent()
@@ -983,19 +1060,26 @@ class Codegen:
         self.dedent()
         self.emit("},")
 
-        if rule_lower in LAYER_RULE_MAP:
-            k, v = LAYER_RULE_MAP[rule_lower]
+        # Normalize rule: strip any "=on"/"=off" suffixes
+        rule_normalized = re.sub(r'=on$', '', rule_lower, flags=re.IGNORECASE).strip()
+        rule_normalized = re.sub(r'=off$', '', rule_normalized, flags=re.IGNORECASE).strip()
+
+        if rule_normalized in LAYER_RULE_MAP:
+            k, v = LAYER_RULE_MAP[rule_normalized]
             if v == "true":
-                self.emit(f"{k} = {v},")
+                self.emit(f"{k} = true,")
+            elif v == "false":
+                self.emit(f"{k} = false,")
             else:
                 self.emit(f"{k} = {self.to_lua_val(v)},")
         else:
             parts = rule_lower.split(None, 1)
             if parts:
-                self.emit(f"{parts[0]} = {self.quote(parts[1]) if len(parts) > 1 else 'true'},")
+                key = re.sub(r'=.*$', '', parts[0]).strip()  # strip =on / =off from key
+                self.emit(f"{key} = {self.quote(parts[1]) if len(parts) > 1 else 'true'},")
 
         self.dedent()
-        self.emit("})")
+        self.emit("})")    
 
     def visit_layerrule_block(self, stmt: LayerRuleBlock):
         self.translated_count += 1
