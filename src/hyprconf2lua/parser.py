@@ -159,7 +159,7 @@ class Parser:
             return ""
         result = tokens[0]
         for t in tokens[1:]:
-            no_space_before = {":", ",", "=", "+", "-", "%", "@", "^", "*", "|", "~"}
+            no_space_before = {":", ",", "="}
             no_space_after = {":", ",", "=", "."}
             if t in no_space_before or result[-1:] in no_space_after or t.startswith(("/", ".")):
                 result += t
