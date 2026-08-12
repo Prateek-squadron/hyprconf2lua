@@ -757,3 +757,11 @@ def test_multiline_exec_continuation():
     assert '\\"$(slurp)\\"' in result.lua
     assert "$FILE" in result.lua
     assert "local_var_FILE" not in result.lua
+
+
+def test_bind_exec_pipe_and_dash_spaces():
+    src = 'bind = , Print, exec, grim -c -g "$(slurp)" - | satty --filename -\n'
+    result = convert(src)
+    assert result.success
+    assert 'grim -c -g \\"$(slurp)\\" - | satty --filename -' in result.lua
+
