@@ -591,6 +591,11 @@ class Codegen:
                     return f'{func}({{ direction = "{dir_map[params[0]]}" }})'
                 return f'{func}({{ direction = {self.quote(params[0]) if params else "nil"} }})'
 
+            if dispatcher == "fullscreen":
+                p = params[0].strip() if params else ""
+                mode = "maximized" if p == "1" else "fullscreen"
+                return f'{func}({{ mode = "{mode}" }})'
+
             if dispatcher == "cyclenext":
                 if params and params[0].lower() == "prev":
                     return f'{func}({{ next = false }})'
