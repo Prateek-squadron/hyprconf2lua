@@ -29,7 +29,7 @@ class ConversionResult:
         return round(self.report.get("translated", 0) / total * 100, 1)
 
 
-def convert(source: str) -> ConversionResult:
+def convert(source: str, seed_variables: Optional[Dict[str, str]] = None) -> ConversionResult:
     errors: list = []
     warnings: list = []
 
@@ -45,7 +45,7 @@ def convert(source: str) -> ConversionResult:
         errors.append(str(e))
         return ConversionResult("", {"translated": 0, "passthrough": 0, "flagged": 0}, errors, warnings)
 
-    gen = Codegen()
+    gen = Codegen(seed_variables=seed_variables)
     try:
         lua = gen.generate(config)
     except Exception as e:

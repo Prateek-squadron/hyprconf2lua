@@ -723,17 +723,20 @@ def test_empty_value_skipped():
     assert "{  }" not in result.lua
 
 
-def test_source_filename_hyphens_sanitized():
+def test_source_filename_hyphens_preserved():
+    # Hyprland's require() resolves relative to hyprland.lua on the real
+    # filesystem, so the generated .lua sibling (media-binds.lua) must be
+    # referenced with its actual hyphenated filename intact.
     result = convert("source = ~/.config/hypr/media-binds.conf\n")
     assert result.success
-    assert 'require("media_binds")' in result.lua
-    assert "local media-binds" not in result.lua
+    assert 'require("media-binds")' in result.lua
+    assert "media_binds" not in result.lua
 
 
 def test_source_path_mapped_to_module():
     result = convert("source = $HOME/.config/hypr/modules/keybinds.conf\n")
     assert result.success
-    assert 'require("modules.keybinds")' in result.lua
+    assert 'require("modules/keybinds")' in result.lua
 
 
 def test_shell_brace_expansion():

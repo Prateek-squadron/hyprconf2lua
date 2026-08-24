@@ -2,11 +2,17 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from typing import Dict, Optional
 
 from hyprconf2lua.converter import convert
+from hyprconf2lua.parser import parse_config, ParserError
+from hyprconf2lua.codegen import Codegen
+from hyprconf2lua.ast import VariableDef
+from hyprconf2lua.lexer import LexerError
 
 
-def convert_file(path: str, check: bool = False, report: bool = False) -> bool:
+def convert_file(path: str, check: bool = False, report: bool = False,
+                  seed_variables: Optional[Dict[str, str]] = None) -> bool:
     try:
         with open(path, "r") as f:
             source = f.read()
@@ -17,7 +23,7 @@ def convert_file(path: str, check: bool = False, report: bool = False) -> bool:
         print(f"Error: {e}", file=sys.stderr)
         return False
 
-    result = convert(source)
+    result = convert(source, seed_variables=seed_variables)
 
     if result.errors:
         for err in result.errors:
@@ -38,38 +44,66 @@ def convert_file(path: str, check: bool = False, report: bool = False) -> bool:
     return result.lua
 
 
+def _collect_conf_paths(dir_path: str) -> list:
+    paths = []
+    for root, dirs, files in os.walk(dir_path):
+        for fname in sorted(files):
+            if fname.endswith(".conf"):
+                paths.append(os.path.join(root, fname))
+    return sorted(paths)
+
+
+def _collect_global_variables(conf_paths: list) -> Dict[str, str]:
+    """Old hyprlang treats every `source`d .conf as one shared file, so a
+    `$var` defined in one file is visible in another. We convert each file
+    independently, so without this, cross-file variables (e.g. `$term`
+    defined in 01-UserDefaults.conf but used in UserKeybinds.conf) silently
+    fall back to a literal placeholder instead of their real value."""
+    gen = Codegen()
+    for path in conf_paths:
+        try:
+            with open(path, "r") as f:
+                source = f.read()
+            config = parse_config(source)
+        except (IOError, ParserError, LexerError):
+            continue
+        for stmt in config.body:
+            if isinstance(stmt, VariableDef):
+                gen.visit_variable(stmt)
+    return gen.variables
+
+
 def process_dir(dir_path: str, in_place: bool = False, check: bool = False,
                 report: bool = False) -> int:
     failed = 0
-    for root, dirs, files in os.walk(dir_path):
-        for fname in files:
-            if not fname.endswith(".conf"):
-                continue
-            fpath = os.path.join(root, fname)
-            lua_path = os.path.splitext(fpath)[0] + ".lua"
+    conf_paths = _collect_conf_paths(dir_path)
+    global_vars = _collect_global_variables(conf_paths)
+    for fpath in conf_paths:
+        lua_path = os.path.splitext(fpath)[0] + ".lua"
 
-            if not check and not in_place:
-                continue
+        if not check and not in_place:
+            continue
 
-            lua_output = convert_file(fpath, check=check, report=report)
-            if lua_output is False:
-                failed += 1
-                if check:
-                    print(f"  FAIL: {fpath}", file=sys.stderr)
-                continue
+        lua_output = convert_file(fpath, check=check, report=report,
+                                   seed_variables=global_vars)
+        if lua_output is False:
+            failed += 1
+            if check:
+                print(f"  FAIL: {fpath}", file=sys.stderr)
+            continue
 
-            if isinstance(lua_output, str):
-                if check:
-                    print(f"  PASS: {fpath}")
-                    continue
-                if in_place:
-                    try:
-                        with open(lua_path, "w") as f:
-                            f.write(lua_output)
-                        print(f"  WROTE: {lua_path}")
-                    except IOError as e:
-                        print(f"  ERROR writing {lua_path}: {e}", file=sys.stderr)
-                        failed += 1
+        if isinstance(lua_output, str):
+            if check:
+                print(f"  PASS: {fpath}")
+                continue
+            if in_place:
+                try:
+                    with open(lua_path, "w") as f:
+                        f.write(lua_output)
+                    print(f"  WROTE: {lua_path}")
+                except IOError as e:
+                    print(f"  ERROR writing {lua_path}: {e}", file=sys.stderr)
+                    failed += 1
 
     return failed
 
