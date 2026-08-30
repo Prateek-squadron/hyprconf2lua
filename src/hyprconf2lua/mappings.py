@@ -58,10 +58,10 @@ DISPATCHER_MAP = {
 
 BIND_FLAGS_TO_OPTIONS = {
     "l": ("locked", "true"),
-    "r": ("repeating", "true"),
+    "r": ("release", "true"),
     "n": ("non_consuming", "true"),
     "m": ("mouse", "true"),
-    "e": ("empty", "true"),
+    "e": ("repeating", "true"),
     "t": ("transparent", "true"),
     "i": ("ignore_mods", "true"),
     "p": ("pass", "true"),
@@ -97,6 +97,8 @@ WINDOW_RULE_PARAM_MAP = {
     "minsize":      ("min_size", True),
     "maxsize":      ("max_size", True),
     "idleinhibit":  ("idle_inhibit", True),
+    "stay_focused": ("stay_focused", True),
+    "dim_around":   ("dim_around", True),
     "xray":         ("xray", True),
     "center":       ("center", True),
     "keepaspectratio": ("keep_aspect_ratio", "true"),
@@ -112,7 +114,7 @@ WINDOW_RULE_PARAM_MAP = {
 
 WORKSPACE_RULE_MAP = {
     "monitor":      "monitor",
-    "default":      "is_default",
+    "default":      "default",
     "gapsin":       "gaps_in",
     "gapsout":      "gaps_out",
     "bordersize":   "border_size",

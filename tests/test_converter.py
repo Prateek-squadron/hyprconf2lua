@@ -488,8 +488,11 @@ def test_no_todo_on_unknown_section():
 
 def test_cli_help():
     import subprocess
+    import os
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
     result = subprocess.run([sys.executable, "-m", "hyprconf2lua", "--help"],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, env=env)
     assert result.returncode == 0
     assert "Convert" in result.stdout
 
@@ -593,7 +596,7 @@ def test_movetoworkspace_conversion():
 def test_movetoworkspacesilent_conversion():
     result = convert('bind = $mainMod SHIFT, 1, movetoworkspacesilent, 1\n')
     assert result.success
-    assert "workspace = 1" in result.lua
+    assert "follow = false" in result.lua
 
 
 def test_single_line_section():

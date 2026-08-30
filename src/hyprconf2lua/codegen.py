@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import os
 import re
 from typing import Dict, List, Optional
@@ -179,6 +180,9 @@ class Codegen:
         return key.replace("-", "_")
 
     def to_lua_val(self, val: str):
+        val = val.strip()
+        if val.endswith(";"):
+            val = val[:-1].strip()
         val = self.resolve_val_with_env(val)
         if val.startswith("local_var_"):
             return val[len("local_var_"):]
@@ -305,8 +309,12 @@ class Codegen:
             self.emit(f"{key} = {val},")
         else:
             self.translated_count += 1
-            vals = [self.to_lua_val(v) for v in values]
-            self.emit(f"{key} = {{ {', '.join(vals)} }},")
+            if key == "kb_options":
+                val_str = ",".join(values)
+                self.emit(f"{key} = {self.quote(val_str)},")
+            else:
+                vals = [self.to_lua_val(v) for v in values]
+                self.emit(f"{key} = {{ {', '.join(vals)} }},")
 
     def _group_section_body(self, directives: List[BlockStmt]) -> List[BlockStmt]:
         grouped: List[BlockStmt] = []
@@ -384,8 +392,11 @@ class Codegen:
                 val = self.to_lua_val(d.value[0])
                 self.emit(f"{key} = {val},")
             else:
-                vals = [self.to_lua_val(v) for v in d.value]
-                self.emit(f"{key} = {{ {', '.join(vals)} }},")
+                if key == "kb_options":
+                    self.emit(f"{key} = {self.quote(','.join(d.value))},")
+                else:
+                    vals = [self.to_lua_val(v) for v in d.value]
+                    self.emit(f"{key} = {{ {', '.join(vals)} }},")
         self.dedent()
         self.emit("},")
 
@@ -408,8 +419,11 @@ class Codegen:
                                 v = self.to_lua_val(sd.value[0])
                                 self.emit(f"{k} = {v},")
                             else:
-                                vals = [self.to_lua_val(v) for v in sd.value]
-                                self.emit(f"{k} = {{ {', '.join(vals)} }},")
+                                if k == "kb_options":
+                                    self.emit(f"{k} = {self.quote(','.join(sd.value))},")
+                                else:
+                                    vals = [self.to_lua_val(v) for v in sd.value]
+                                    self.emit(f"{k} = {{ {', '.join(vals)} }},")
                     self.dedent()
                     self.emit("end)")
                 elif isinstance(child, Directive):
@@ -504,10 +518,9 @@ class Codegen:
 
         if dsp_code is None:
             self.flag_count += 1
-            mods_str = " + ".join(stmt.mods) if stmt.mods else ""
             self.emit(f'-- TODO: manual review (unknown dispatcher: {stmt.dispatcher})')
             pstr = ", ".join(self.quote(self.resolve_val(p)) for p in stmt.params)
-            self.emit(f'-- hl.bind("{mods_str} + {stmt.key}", hl.dsp.{stmt.dispatcher}({pstr}))')
+            self.emit(f'-- hl.bind({combo_expr}, hl.dsp.{stmt.dispatcher}({pstr}))')
             return
 
         opt_parts = []
@@ -538,7 +551,7 @@ class Codegen:
                 if var_name in self.variables:
                     parts.append(var_name)
                 else:
-                    parts.append(self.quote(m))
+                    parts.append("local_var_" + var_name)
             else:
                 parts.append(self.quote(m))
 
@@ -546,6 +559,10 @@ class Codegen:
             return key_str
 
         has_var = any(not p.startswith('"') for p in parts)
+
+        if not has_var and not is_key_var:
+            all_str = " + ".join(p.strip('"') for p in parts)
+            return self.quote(all_str + " + " + key_str.strip('"'))
 
         if not has_var:
             all_str = " + ".join(p.strip('"') for p in parts)
@@ -582,7 +599,10 @@ class Codegen:
 
             if dispatcher == "movetoworkspacesilent":
                 args = self.build_dispatcher_args(params, needs_args, func)
-                return f'{func}({args}, {{ follow = false }})'
+                # Combine workspace dict with follow flag into single dict
+                if args and args.endswith("}"):
+                    args = args.rstrip("}") + ", follow = false}"
+                return f'{func}({args})'
 
             if dispatcher == "movefocus":
                 dir_map = {"l": "left", "r": "right", "u": "up", "d": "down"}
@@ -594,6 +614,9 @@ class Codegen:
                 if params and params[0].lower() == "prev":
                     return f'{func}({{ next = false }})'
                 return f'{func}()'
+
+            if dispatcher == "pass":
+                return f'{func}({{ window = {self.quote(params[0]) if params else "nil"} }})'
 
             if dispatcher == "resizeactive":
                 nums = params[0].split() if params else []
@@ -647,7 +670,7 @@ class Codegen:
                 return self.build_focus_dispatcher(func, params)
 
             if dispatcher == "focusurgentorlast":
-                return f'{func}({{ urgent = true }})'
+                return f'{func}({{ urgent_or_last = true }})'
 
             if dispatcher == "focuscurrentorlast":
                 return f'{func}({{ last = true }})'
@@ -817,6 +840,7 @@ class Codegen:
         self.indent()
 
         name_str = re.sub(r'[^a-zA-Z0-9_-]', '_', name_source[:20].lower())
+        name_str = f"{name_str}_{stmt.line}"
         self.emit(f'name  = "{name_str}",')
 
         self.emit("match = {")
@@ -898,7 +922,7 @@ class Codegen:
         if style and style != "default":
             style_extra = f', style = {self.quote(style)}'
 
-        if curve and curve != "default":
+        if curve:
             if re.match(r'^\d+(\.\d+)?$', curve):
                 return self.emit(f"-- TODO: manual review (numeric curve ref in animation: {stmt.name})")
 
