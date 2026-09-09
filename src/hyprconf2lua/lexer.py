@@ -14,7 +14,7 @@ TOKEN_SPECS = [
     ("COLON",      r":"),
     ("SHELL_EXP",  r"\$\{[^}\n]*\}"),
     ("DOLLAR",     r"\$"),
-    ("STRING",     r'"([^"\\]|\\.)*"'),
+    ("STRING",     r'"([^"\\]|\\.)*"|\'([^\'\\]|\\.)*\''),
     ("CONT",       r"\\[ \t]*\n"),
     ("IDENT",      r'[^\s#"={},:!]+'),
     ("NEWLINE",    r"\n"),
@@ -71,7 +71,7 @@ def tokenize(source: str) -> List[Token]:
         elif kind == "MISMATCH":
             raise LexerError(f"Unexpected character: {value!r}", line, _col(pos))
         elif kind == "STRING":
-            tokens.append(Token("STRING", value[1:-1], line, _col(pos)))
+            tokens.append(Token("STRING", value, line, _col(pos)))
         else:
             tokens.append(Token(kind, value, line, _col(pos)))
 

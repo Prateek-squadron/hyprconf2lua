@@ -15,7 +15,7 @@ BIND_FLAG_MAP = {
     "bindn":  "n",
     "bindo":  "",
     "bindm":  "m",
-    "binde":  "",
+    "binde":  "e",
     "bindt":  "t",
     "bindi":  "i",
     "bindp":  "p",
@@ -212,8 +212,8 @@ class Parser:
                 current.append("$" + var_t.value)
             else:
                 t = self.advance()
-                if keep_string_quotes and t.type == "STRING":
-                    current.append('"' + t.value + '"')
+                if t.type == "STRING" and not keep_string_quotes:
+                    current.append(t.value[1:-1])
                 else:
                     current.append(t.value)
         remaining = self._join_tokens(current)
@@ -445,8 +445,8 @@ class Parser:
                 parts.append("$" + var_t.value)
             else:
                 t = self.advance()
-                if keep_string_quotes and t.type == "STRING":
-                    parts.append('"' + t.value + '"')
+                if t.type == "STRING" and not keep_string_quotes:
+                    parts.append(t.value[1:-1])
                 else:
                     parts.append(t.value)
         return self._join_tokens(parts)
