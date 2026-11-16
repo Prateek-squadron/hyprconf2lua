@@ -875,3 +875,19 @@ def test_rgba_color_values():
     assert result.success
     assert '"rgba(0,0,0,0.85)"' in result.lua
     assert "shadow = { color =" in result.lua
+
+
+def test_report_counts_flagged_windowrule_once():
+    result = convert(
+        "windowrule = float, class:foo\n"
+        "windowrule = bogus, class:foo\n"
+        "windowrule = bogus, other, class:bar\n"
+    )
+    assert result.success
+    assert result.report == {"translated": 1, "passthrough": 0, "flagged": 2}
+
+
+def test_report_counts_unknown_dispatcher_bind_once():
+    result = convert("bind = SUPER, Q, notadispatcher, arg\n")
+    assert result.success
+    assert result.report == {"translated": 0, "passthrough": 0, "flagged": 1}
