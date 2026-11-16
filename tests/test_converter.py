@@ -891,3 +891,39 @@ def test_report_counts_unknown_dispatcher_bind_once():
     result = convert("bind = SUPER, Q, notadispatcher, arg\n")
     assert result.success
     assert result.report == {"translated": 0, "passthrough": 0, "flagged": 1}
+
+
+def test_directory_conversion_writes_missing_lua():
+    from hyprconf2lua.cli import process_dir
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "new.conf"), "w") as f:
+            f.write("bind = SUPER, Q, exec, kitty\n")
+        with open(os.path.join(tmpdir, "old.conf"), "w") as f:
+            f.write("bind = SUPER, Q, exec, kitty\n")
+        old_lua = os.path.join(tmpdir, "old.lua")
+        with open(old_lua, "w") as f:
+            f.write("-- hand-edited\n")
+
+        failed = process_dir(tmpdir)
+
+        assert failed == 0
+        with open(os.path.join(tmpdir, "new.lua")) as f:
+            assert "hl.bind" in f.read()
+        with open(old_lua) as f:
+            assert f.read() == "-- hand-edited\n"
+
+
+def test_directory_conversion_in_place_overwrites_lua():
+    from hyprconf2lua.cli import process_dir
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "old.conf"), "w") as f:
+            f.write("bind = SUPER, Q, exec, kitty\n")
+        old_lua = os.path.join(tmpdir, "old.lua")
+        with open(old_lua, "w") as f:
+            f.write("-- hand-edited\n")
+
+        failed = process_dir(tmpdir, in_place=True)
+
+        assert failed == 0
+        with open(old_lua) as f:
+            assert "hl.bind" in f.read()
