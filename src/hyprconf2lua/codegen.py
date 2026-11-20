@@ -518,7 +518,7 @@ class Codegen:
                 params = rest
 
         if dsp_code is None:
-            self.flag_count += 1
+            self._reclassify_as_flagged()
             self.emit(f'-- TODO: manual review (unknown dispatcher: {stmt.dispatcher})')
             pstr = ", ".join(self.quote(self.resolve_val(p)) for p in stmt.params)
             self.emit(f'-- hl.bind({combo_expr}, hl.dsp.{stmt.dispatcher}({pstr}))')
@@ -864,10 +864,13 @@ class Codegen:
         self.dedent()
         self.emit("},")
 
+        flagged = False
         for prop in props:
             if not self._emit_rule_effect(prop):
-                self.flag_count += 1
+                flagged = True
                 self.emit(f'-- TODO: review rule: {self.quote(prop)}')
+        if flagged:
+            self._reclassify_as_flagged()
 
         self.dedent()
         self.emit("})")
@@ -1137,6 +1140,12 @@ class Codegen:
 
         self.dedent()
         self.emit("})")
+
+    def _reclassify_as_flagged(self):
+        # The visitor counted this directive as translated on entry; a
+        # directive is reported in exactly one bucket, so move it to flagged.
+        self.translated_count -= 1
+        self.flag_count += 1
 
     def get_report(self) -> dict:
         return {
