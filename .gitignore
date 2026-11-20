@@ -8,3 +8,4 @@ build/
 .DS_Store
 *.lua
 !example/*.lua
+.env
