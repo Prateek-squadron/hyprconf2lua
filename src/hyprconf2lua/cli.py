@@ -48,7 +48,9 @@ def process_dir(dir_path: str, in_place: bool = False, check: bool = False,
             fpath = os.path.join(root, fname)
             lua_path = os.path.splitext(fpath)[0] + ".lua"
 
-            if not check and not in_place:
+            if not check and not in_place and os.path.exists(lua_path):
+                print(f"  SKIP: {lua_path} exists (use --in-place to overwrite)",
+                      file=sys.stderr)
                 continue
 
             lua_output = convert_file(fpath, check=check, report=report)
@@ -62,14 +64,13 @@ def process_dir(dir_path: str, in_place: bool = False, check: bool = False,
                 if check:
                     print(f"  PASS: {fpath}")
                     continue
-                if in_place:
-                    try:
-                        with open(lua_path, "w") as f:
-                            f.write(lua_output)
-                        print(f"  WROTE: {lua_path}")
-                    except IOError as e:
-                        print(f"  ERROR writing {lua_path}: {e}", file=sys.stderr)
-                        failed += 1
+                try:
+                    with open(lua_path, "w") as f:
+                        f.write(lua_output)
+                    print(f"  WROTE: {lua_path}")
+                except IOError as e:
+                    print(f"  ERROR writing {lua_path}: {e}", file=sys.stderr)
+                    failed += 1
 
     return failed
 
