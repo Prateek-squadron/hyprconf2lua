@@ -512,9 +512,25 @@ class Parser:
     def parse_gesture_inline(self, line: int) -> GestureDirective:
         self.expect("EQUALS")
         values = self.parse_comma_values()
-        names = ["fingers", "direction", "action"]
-        body = [Directive(names[i], [v], line, 0)
-                for i, v in enumerate(values) if v.strip() and i < len(names)]
+        cleaned = [v.strip() for v in values if v.strip()]
+        body = []
+        if len(cleaned) > 0:
+            body.append(Directive("fingers", [cleaned[0]], line, 0))
+        if len(cleaned) > 1:
+            body.append(Directive("direction", [cleaned[1]], line, 0))
+        action_parts = []
+        for val in cleaned[2:]:
+            if not action_parts and ":" in val:
+                key, opt_val = val.split(":", 1)
+                key = key.strip()
+                opt_val = opt_val.strip()
+                if key == "mod":
+                    key = "mods"
+                body.append(Directive(key, [opt_val], line, 0))
+            else:
+                action_parts.append(val)
+        if action_parts:
+            body.append(Directive("action", [", ".join(action_parts)], line, 0))
         return GestureDirective(body, line)
 
     def parse_device(self, name: str, line: int) -> DeviceSection:

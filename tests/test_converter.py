@@ -839,6 +839,26 @@ def test_gesture_inline_in_section():
     assert gest_pos > cfg_pos
 
 
+def test_gesture_inline_with_mods():
+    result = convert("gesture = 3, up, mod: SUPER, fullscreen\n")
+    assert result.success
+    assert "hl.gesture({" in result.lua
+    assert '["fingers"] = 3,' in result.lua
+    assert '["direction"] = "up",' in result.lua
+    assert '["mods"] = "SUPER",' in result.lua
+    assert '["action"] = "fullscreen",' in result.lua
+
+
+def test_gesture_inline_with_multiple_options():
+    result = convert("gesture = 4, down, scale: 1.5, mod: SUPER, closewindow\n")
+    assert result.success
+    assert '["fingers"] = 4,' in result.lua
+    assert '["direction"] = "down",' in result.lua
+    assert '["scale"] = 1.5,' in result.lua
+    assert '["mods"] = "SUPER",' in result.lua
+    assert '["action"] = "closewindow",' in result.lua
+
+
 def test_movewindow_direction_expanded():
     result = convert("bind = SUPER SHIFT, L, movewindow, l\n")
     assert result.success
