@@ -9,7 +9,7 @@
   <a href="https://pepy.tech/projects/hyprconf2lua"><img src="https://static.pepy.tech/personalized-badge/hyprconf2lua?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=BLUE&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="https://pypi.org/project/hyprconf2lua/"><img src="https://img.shields.io/pypi/pyversions/hyprconf2lua.svg" alt="Python versions"></a>
   <a href="https://github.com/Prateek-squadron/hyprconf2lua/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-  <a href="https://github.com/Prateek-squadron/hyprconf2lua/actions"><img src="https://img.shields.io/badge/tests-112%20passed-success.svg" alt="Tests status"></a>
+  <a href="https://github.com/Prateek-squadron/hyprconf2lua/actions"><img src="https://img.shields.io/badge/tests-131%20passed-success.svg" alt="Tests status"></a>
 </p>
 
 ---

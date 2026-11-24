@@ -116,6 +116,12 @@ class DeviceSection:
 class GestureDirective:
     body: List[Directive]
     line: int
+    # True for the one-line `gesture = ...` form, whose body keys are already
+    # the final hl.gesture field names. False for the legacy `gesture { }` block.
+    inline: bool = False
+    # Fields after the action that hl.gesture has no named field for:
+    # dispatcher arguments, or trailing fields Hyprland ignores.
+    extra_args: List[str] = field(default_factory=list)
 
 
 @dataclass
