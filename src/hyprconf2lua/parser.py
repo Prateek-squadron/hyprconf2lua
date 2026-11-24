@@ -5,6 +5,18 @@ from hyprconf2lua.lexer import Token, LexerError
 from hyprconf2lua.ast import *
 
 
+# `gesture =` option prefixes -> hl.gesture field names.
+GESTURE_OPTIONS = {"mod": "mods", "scale": "scale"}
+
+# Positional arguments that follow a gesture action -> hl.gesture field names,
+# from Hyprland's handleGesture (hyprlang side) and hlGesture (Lua side).
+GESTURE_ACTION_ARGS = {
+    "fullscreen": ["mode"],
+    "float": ["mode"],
+    "special": ["workspace_name"],
+    "cursorZoom": ["zoom_level", "mode"],
+}
+
 BIND_PREFIXES = {"bindm", "binde", "bindr", "bindl", "bindn", "bindo",
                  "bindt", "bindi", "bindp", "bindc", "bindd"}
 
@@ -269,10 +281,10 @@ class Parser:
             return self.parse_env(t.line)
         if directive == "source":
             return self.parse_source(t.line)
-        if directive == "gesture":
-            if self.peek().type == "BLOCK_OPEN":
-                return self.parse_gesture(t.line)
-            return self.parse_gesture_inline(t.line)
+        if directive == "gesture" and self.peek().type == "BLOCK_OPEN":
+            return self.parse_gesture(t.line)
+        if directive in ("gesture", "gesturep"):
+            return self.parse_gesture_inline(directive, t.line)
         if directive == "workspace":
             return self.parse_workspace(t.line)
         if directive == "layerrule":
@@ -509,13 +521,50 @@ class Parser:
         self.expect("BLOCK_CLOSE")
         return GestureDirective(body, line)
 
-    def parse_gesture_inline(self, line: int) -> GestureDirective:
+    def parse_gesture_inline(self, directive: str, line: int) -> GestureDirective:
+        """Parse `gesture[p] = fingers, direction, [mod:X | scale:Y]..., action, [args...]`.
+
+        Mirrors Hyprland's CConfigManager::handleGesture (v0.54.3): fingers and
+        direction are always the first two fields; any number of `mod:`/`scale:`
+        options follow in any order (the last of each wins); the first other
+        field is the action, and everything after it belongs to the action.
+        Evidence: a harness running Hyprland's real handleGesture, in the
+        verification/issue-62-hyprland-0.54.3-gestures/ directory of
+        https://github.com/sinback/hyprconf2lua/tree/example/fix-mods-for-gestures-testing
+        """
         self.expect("EQUALS")
-        values = self.parse_comma_values()
-        names = ["fingers", "direction", "action"]
-        body = [Directive(names[i], [v], line, 0)
-                for i, v in enumerate(values) if v.strip() and i < len(names)]
-        return GestureDirective(body, line)
+        values = [v.strip() for v in self.parse_comma_values()]
+
+        fields: Dict[str, str] = {}
+        if len(values) > 0:
+            fields["fingers"] = values[0]
+        if len(values) > 1:
+            fields["direction"] = values[1]
+
+        idx = 2
+        while idx < len(values):
+            option = next((o for o in GESTURE_OPTIONS if values[idx].startswith(o + ":")), None)
+            if option is None:
+                break
+            fields[GESTURE_OPTIONS[option]] = values[idx][len(option) + 1:].strip()
+            idx += 1
+
+        if directive == "gesturep":
+            fields["disable_inhibit"] = "true"
+
+        extra_args: List[str] = []
+        if idx < len(values):
+            action = values[idx]
+            fields["action"] = action
+            args = values[idx + 1:]
+            arg_names = GESTURE_ACTION_ARGS.get(action, [])
+            for name, arg in zip(arg_names, args):
+                if arg:
+                    fields[name] = arg
+            extra_args = args[len(arg_names):]
+
+        body = [Directive(k, [v], line, 0) for k, v in fields.items() if v]
+        return GestureDirective(body, line, inline=True, extra_args=extra_args)
 
     def parse_device(self, name: str, line: int) -> DeviceSection:
         self.skip_newlines()

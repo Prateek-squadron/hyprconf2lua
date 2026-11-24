@@ -1015,7 +1015,21 @@ class Codegen:
         self.dedent()
         self.emit("})")
 
+    # hl.gesture fields Hyprland reads as numbers or booleans; every other
+    # field is read with a string parser, so it is emitted as a string.
+    _GESTURE_NUMBER_FIELDS = {"fingers", "scale"}
+    _GESTURE_BOOL_FIELDS = {"disable_inhibit"}
+
+    def _gesture_field_val(self, key: str, val: str) -> str:
+        if key in self._GESTURE_NUMBER_FIELDS or key in self._GESTURE_BOOL_FIELDS or "$" in val:
+            return self.to_lua_val(val)
+        escaped = val.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
+
     def visit_gesture(self, stmt: GestureDirective):
+        if stmt.inline:
+            self._visit_inline_gesture(stmt)
+            return
         self.translated_count += 1
         props = {}
         for d in stmt.body:
@@ -1028,6 +1042,48 @@ class Codegen:
             lua_v = self.to_lua_val(v)
             lua_k = k.replace("_", " ")
             self.emit(f"[{self.quote(lua_k)}] = {lua_v},")
+        self.dedent()
+        self.emit("})")
+
+    def _visit_inline_gesture(self, stmt: GestureDirective):
+        self.translated_count += 1
+        fields = {d.key: d.value[0] for d in stmt.body if isinstance(d, Directive) and d.value}
+
+        notes = []
+        if "scale" in fields:
+            # hyprlang clamps scale to [0.1, 10]; hl.gesture rejects values
+            # outside [-10, -0.1] U [0.1, 10] instead, so clamp here to match.
+            try:
+                raw = float(fields["scale"])
+                clamped = min(max(raw, 0.1), 10.0)
+                if clamped != raw:
+                    notes.append(f"-- NOTE: scale {fields['scale']} clamped to {clamped:g}, as Hyprland's .conf parser does")
+                    fields["scale"] = f"{clamped:g}"
+            except ValueError:
+                pass
+
+        body = [f"[{self.quote(k)}] = {self._gesture_field_val(k, v)}," for k, v in fields.items()]
+
+        if fields.get("action") == "dispatcher":
+            # hl.gesture has no string form for dispatcher gestures; it takes
+            # `action = function() ... end`, which needs a human to write.
+            self._reclassify_as_flagged()
+            self.emit(f"-- TODO: manual review (gesture dispatcher: {', '.join(stmt.extra_args)}); "
+                      "hl.gesture needs action = function() ... end")
+            self.emit("-- hl.gesture({")
+            for line in body:
+                self.emit(f"--     {line}")
+            self.emit("-- })")
+            return
+
+        if stmt.extra_args:
+            notes.append(f"-- NOTE: Hyprland ignores trailing gesture field(s): {', '.join(stmt.extra_args)}")
+        for note in notes:
+            self.emit(note)
+        self.emit("hl.gesture({")
+        self.indent()
+        for line in body:
+            self.emit(line)
         self.dedent()
         self.emit("})")
 
