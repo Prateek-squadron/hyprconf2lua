@@ -143,11 +143,13 @@ class Codegen:
             return m.group(0)
         return re.sub(r'\$(\w+)', _repl, val)
 
+    _ENV_CALL_RE = re.compile(r'(os\.getenv\("[A-Za-z_][A-Za-z0-9_]*"\))')
+
     def _build_concat_expr(self, val: str) -> str:
-        parts = re.split(r'(os\.getenv\([^)]+\))', val)
+        parts = self._ENV_CALL_RE.split(val)
         expr_parts = []
         for part in parts:
-            if part.startswith("os.getenv("):
+            if self._ENV_CALL_RE.fullmatch(part):
                 expr_parts.append(part)
             elif part:
                 expr_parts.append(self.quote(part))
@@ -155,10 +157,35 @@ class Codegen:
             return '""'
         return " .. ".join(expr_parts)
 
+    @staticmethod
+    def _is_valid_quoted_lua_str(val: str) -> bool:
+        if len(val) < 2 or not (val.startswith('"') and val.endswith('"')):
+            return False
+        escaped = False
+        for ch in val[1:-1]:
+            if ch in ("\n", "\r"):
+                return False
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                return False
+        return not escaped
+
+    @staticmethod
+    def _escape_lua_str(val: str) -> str:
+        return (
+            val.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+        )
+
     def needs_quotes(self, val: str) -> bool:
         if not val:
             return True
-        if val.startswith('"') and val.endswith('"'):
+        if self._is_valid_quoted_lua_str(val):
             return False
         if re.match(r'^-?\d+(\.\d+)?$', val):
             return False
@@ -172,8 +199,7 @@ class Codegen:
 
     def quote(self, val: str) -> str:
         if self.needs_quotes(val):
-            escaped = val.replace("\\", "\\\\").replace('"', '\\"')
-            return f'"{escaped}"'
+            return f'"{self._escape_lua_str(val)}"'
         return val
 
     @staticmethod
@@ -187,7 +213,7 @@ class Codegen:
         val = self.resolve_val_with_env(val)
         if val.startswith("local_var_"):
             return val[len("local_var_"):]
-        if "os.getenv(" in val:
+        if self._ENV_CALL_RE.search(val):
             return self._build_concat_expr(val)
         if val.lower() in ("true", "on", "yes"):
             return "true"
@@ -211,7 +237,8 @@ class Codegen:
         self.translated_count += 1
         if stmt.name.upper() == "MAINMOD" or stmt.name == "mainMod":
             self.main_mod_var = stmt.name
-            self.emit(f'local {stmt.name} = "{val}"')
+            quoted = val if self._is_valid_quoted_lua_str(val) else f'"{self._escape_lua_str(val)}"'
+            self.emit(f'local {stmt.name} = {quoted}')
         else:
             if self.needs_quotes(val):
                 self.emit(f'local {stmt.name} = {self.quote(val)}')
@@ -229,7 +256,7 @@ class Codegen:
         resolved = self.resolve_val_exec(cmd)
         if resolved.startswith("$") and resolved[1:] in self.variables:
             return resolved[1:]
-        if "os.getenv(" in resolved:
+        if self._ENV_CALL_RE.search(resolved):
             return self._build_concat_expr(resolved)
         return self.quote(resolved)
 
@@ -695,7 +722,7 @@ class Codegen:
             if dispatcher in ("exec", "execr"):
                 raw = params[0] if params else ""
                 resolved = self.resolve_val_exec(raw)
-                if "os.getenv(" in resolved:
+                if self._ENV_CALL_RE.search(resolved):
                     return f'{func}({self._build_concat_expr(resolved)})'
                 return f'{func}({self.quote(resolved)})'
 
@@ -1023,8 +1050,7 @@ class Codegen:
     def _gesture_field_val(self, key: str, val: str) -> str:
         if key in self._GESTURE_NUMBER_FIELDS or key in self._GESTURE_BOOL_FIELDS or "$" in val:
             return self.to_lua_val(val)
-        escaped = val.replace("\\", "\\\\").replace('"', '\\"')
-        return f'"{escaped}"'
+        return f'"{self._escape_lua_str(val)}"'
 
     def visit_gesture(self, stmt: GestureDirective):
         if stmt.inline:

@@ -53,10 +53,13 @@ class ParserError(Exception):
 
 
 class Parser:
+    MAX_BLOCK_DEPTH = 64
+
     def __init__(self, tokens: List[Token]):
         self.tokens = tokens
         self.pos = 0
         self.variables: Dict[str, str] = {}
+        self._depth = 0
 
     def peek(self) -> Token:
         return self.tokens[self.pos]
@@ -81,14 +84,23 @@ class Parser:
         return ConfigFile(body)
 
     def parse_block(self, stop: Optional[str] = None) -> Block:
-        stmts: Block = []
-        self.skip_newlines()
-        while self.peek().type != "EOF" and (stop is None or self.peek().type != stop):
-            stmt = self.parse_stmt()
-            if stmt is not None:
-                stmts.append(stmt)
+        self._depth += 1
+        if self._depth > self.MAX_BLOCK_DEPTH:
+            raise ParserError(
+                f"Maximum nesting depth ({self.MAX_BLOCK_DEPTH}) exceeded",
+                self.peek(),
+            )
+        try:
+            stmts: Block = []
             self.skip_newlines()
-        return self._group_submaps(stmts)
+            while self.peek().type != "EOF" and (stop is None or self.peek().type != stop):
+                stmt = self.parse_stmt()
+                if stmt is not None:
+                    stmts.append(stmt)
+                self.skip_newlines()
+            return self._group_submaps(stmts)
+        finally:
+            self._depth -= 1
 
     def _group_submaps(self, stmts: Block) -> Block:
         result: Block = []

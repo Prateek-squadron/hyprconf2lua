@@ -64,6 +64,11 @@ def process_dir(dir_path: str, in_place: bool = False, check: bool = False,
                 if check:
                     print(f"  PASS: {fpath}")
                     continue
+                if os.path.islink(lua_path):
+                    print(f"  SKIP: {lua_path} is a symlink (refusing to overwrite)",
+                          file=sys.stderr)
+                    failed += 1
+                    continue
                 try:
                     with open(lua_path, "w") as f:
                         f.write(lua_output)
@@ -159,6 +164,9 @@ Examples:
         sys.exit(0)
 
     if args.out:
+        if os.path.islink(args.out):
+            print(f"Error: refusing to write through symlink: {args.out}", file=sys.stderr)
+            sys.exit(1)
         try:
             with open(args.out, "w") as f:
                 f.write(result.lua)

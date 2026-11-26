@@ -49,6 +49,7 @@ hyprlang source (.conf)
 - **Recursive Directory Walk**: Convert entire multi-file config directories (`--dir`) in one command. Missing `.lua` files are created safely without overwriting existing manual edits unless `--in-place` is specified.
 - **Audit & Coverage Report**: Built-in `--report` mode categorizes directives into translated, passthrough, and flagged items, ensuring high conversion confidence.
 - **CI / Validation Mode**: `--check` returns exit code `3` if any directive requires manual intervention.
+- **Security Hardened**: Strict Lua string-escape validation, `os.getenv` injection protection, symlink write-target protection (`--dir` / `-o`), and bounded parser nesting depth (`MAX_BLOCK_DEPTH = 64`).
 - **Zero Dependencies**: Pure Python with no third-party package dependencies.
 
 ---
