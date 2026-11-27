@@ -12,7 +12,7 @@ checkdepends=('python-pytest')
 provides=('python-hyprconf2lua')
 conflicts=('python-hyprconf2lua')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('3bf5899fe3131332bfac2733751040543cabd40514dadce5ab6149eb297e7e30')
 
 build() {
   cd "$pkgname-$pkgver"
