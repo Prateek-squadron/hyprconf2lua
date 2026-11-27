@@ -54,6 +54,7 @@ DISPATCHER_MAP = {
     "forcekillactive":   ("hl.dsp.window.kill", False),
     "resizeactive":      ("hl.dsp.window.resize", True),
     "movecurrentworkspacetomonitor": ("hl.dsp.workspace.move", True),
+    "releaseinputcapture": ("hl.dsp.release_input_capture", False),
 }
 
 BIND_FLAGS_TO_OPTIONS = {
@@ -64,7 +65,12 @@ BIND_FLAGS_TO_OPTIONS = {
     "e": ("repeating", "true"),
     "t": ("transparent", "true"),
     "i": ("ignore_mods", "true"),
-    "p": ("pass", "true"),
+    "p": ("dont_inhibit", "true"),
+    "o": ("long_press", "true"),
+    "u": ("submap_universal", "true"),
+    "x": ("allow_input_capture", "true"),
+    "c": ("click", "true"),
+    "g": ("drag", "true"),
 }
 
 WINDOW_RULE_MAP = {

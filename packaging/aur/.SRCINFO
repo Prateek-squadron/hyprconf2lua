@@ -1,0 +1,19 @@
+pkgbase = hyprconf2lua
+	pkgdesc = Convert Hyprland hyprlang (.conf) configurations to Lua (.lua) format (v0.55+)
+	pkgver = 1.9.0
+	pkgrel = 1
+	url = https://github.com/Prateek-squadron/hyprconf2lua
+	arch = any
+	license = MIT
+	checkdepends = python-pytest
+	makedepends = python-build
+	makedepends = python-installer
+	makedepends = python-wheel
+	makedepends = python-setuptools
+	depends = python
+	provides = python-hyprconf2lua
+	conflicts = python-hyprconf2lua
+	source = hyprconf2lua-1.9.0.tar.gz::https://github.com/Prateek-squadron/hyprconf2lua/archive/v1.9.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = hyprconf2lua

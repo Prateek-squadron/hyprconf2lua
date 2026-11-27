@@ -15,6 +15,7 @@ KNOWN_SECTIONS = {
     "experimental", "layout", "scrolling", "quirks", "blur",
     "shadow", "touchpad", "tablet", "windowing", "startup",
     "autostart", "window", "monitor", "workspace", "layer",
+    "input_capture", "input-capture",
 }
 
 MULTI_VALUE_EFFECT_KEYS = {"move", "size", "opacity", "alpha"}
@@ -111,6 +112,8 @@ class Codegen:
             self.visit_layerrule(stmt)
         elif isinstance(stmt, LayerRuleBlock):
             self.visit_layerrule_block(stmt)
+        elif isinstance(stmt, PermissionDirective):
+            self.visit_permission(stmt)
         else:
             self.flag_count += 1
             self.emit(f"-- TODO: manual review (unknown statement type: {type(stmt).__name__})")
@@ -367,14 +370,14 @@ class Codegen:
 
         self.emit(f"hl.config({{")
         self.indent()
-        self.emit(f"{section_name} = {{")
+        self.emit(f"{self._normalize_key(section_name)} = {{")
         self.indent()
 
         for d in self._group_section_body(directives):
             if isinstance(d, Comment):
                 self.emit(f"--{d.text[1:]}")
             elif isinstance(d, Section):
-                sub_name = d.name
+                sub_name = self._normalize_key(d.name)
                 self.emit(f"{sub_name} = {{")
                 self.indent()
                 for sd in d.body:
@@ -471,6 +474,8 @@ class Codegen:
                 else:
                     body.append(child)
             return self.visit(DeviceSection(name, body, stmt.line))
+        if stmt.name == "monitorv2" or stmt.name.startswith("monitorv2:"):
+            return self.visit_monitorv2(stmt)
         if stmt.name in KNOWN_SECTIONS:
             self.emit_section_config(stmt.name, stmt.body)
         else:
@@ -478,7 +483,7 @@ class Codegen:
             deferred: List[BlockStmt] = []
             self.emit(f"hl.config({{")
             self.indent()
-            self.emit(f"{stmt.name} = {{")
+            self.emit(f"{self._normalize_key(stmt.name)} = {{")
             self.indent()
             for child in self._group_section_body(stmt.body):
                 if isinstance(child, Comment):
@@ -527,11 +532,27 @@ class Codegen:
         dispatcher = stmt.dispatcher
         params = stmt.params
 
-        if stmt.key.startswith("mouse:") and not params:
-            if dispatcher == "movewindow":
+        if dispatcher.startswith("resizewindow ") and not params:
+            parts = dispatcher.split(None, 1)
+            dispatcher = parts[0]
+            params = [parts[1].strip()]
+        elif dispatcher.startswith("movewindow ") and not params:
+            parts = dispatcher.split(None, 1)
+            dispatcher = parts[0]
+            params = [parts[1].strip()]
+
+        if stmt.key.startswith("mouse:"):
+            if dispatcher == "resizewindow":
+                if params == ["1"]:
+                    dsp_code = "hl.dsp.window.resize({ keep_aspect_ratio = true })"
+                elif params == ["2"]:
+                    dsp_code = "hl.dsp.window.resize({ keep_aspect_ratio = false })"
+                elif not params or params == ["0"]:
+                    dsp_code = "hl.dsp.window.resize()"
+                else:
+                    dsp_code = self.build_dispatcher(dispatcher, params)
+            elif dispatcher == "movewindow" and not params:
                 dsp_code = "hl.dsp.window.drag()"
-            elif dispatcher == "resizewindow":
-                dsp_code = "hl.dsp.window.resize()"
             else:
                 dsp_code = self.build_dispatcher(dispatcher, params)
         else:
@@ -544,6 +565,22 @@ class Codegen:
                 dispatcher = first_param
                 params = rest
 
+        # Rewrite legacy `exec, hyprctl dispatch X` to direct `hl.dsp.*`
+        if dispatcher in ("exec", "execr") and params:
+            raw_cmd = params[0].strip()
+            if raw_cmd.startswith("hyprctl dispatch "):
+                dispatch_body = raw_cmd[len("hyprctl dispatch "):].strip()
+                if "," in dispatch_body:
+                    sub_parts = [p.strip() for p in dispatch_body.split(",") if p.strip()]
+                else:
+                    sub_parts = dispatch_body.split(None, 1)
+                if sub_parts:
+                    sub_dsp = sub_parts[0]
+                    sub_args = sub_parts[1:] if len(sub_parts) > 1 else []
+                    sub_code = self.build_dispatcher(sub_dsp, sub_args)
+                    if sub_code is not None:
+                        dsp_code = sub_code
+
         if dsp_code is None:
             self._reclassify_as_flagged()
             self.emit(f'-- TODO: manual review (unknown dispatcher: {stmt.dispatcher})')
@@ -554,9 +591,22 @@ class Codegen:
         opt_parts = []
         if stmt.flags:
             for f in stmt.flags:
+                if f == "d":
+                    continue
+                if f == "c":
+                    opt_parts.append("click = true")
+                    opt_parts.append("release = true")
+                    continue
+                if f == "g":
+                    opt_parts.append("drag = true")
+                    opt_parts.append("release = true")
+                    continue
                 if f in BIND_FLAGS_TO_OPTIONS:
                     opt_key, opt_val = BIND_FLAGS_TO_OPTIONS[f]
                     opt_parts.append(f"{opt_key} = {opt_val}")
+
+        if stmt.description:
+            opt_parts.append(f"description = {self.quote(self.resolve_val(stmt.description))}")
 
         if opt_parts:
             opts = ", { " + ", ".join(opt_parts) + " }"
@@ -1222,6 +1272,79 @@ class Codegen:
 
         self.dedent()
         self.emit("})")
+
+    def visit_monitorv2(self, stmt: Section):
+        self.translated_count += 1
+        default_name = ""
+        if ":" in stmt.name:
+            default_name = stmt.name.split(":", 1)[1].strip()
+
+        fields = {}
+        for child in stmt.body:
+            if isinstance(child, Directive):
+                k = self._normalize_key(child.key.strip())
+                v = child.value[0].strip() if child.value else ""
+                fields[k] = v
+
+        if default_name and "output" not in fields and "name" not in fields:
+            fields["output"] = default_name
+
+        self.emit("hl.monitor({")
+        self.indent()
+
+        order = ["output", "name", "mode", "position", "scale", "disabled", "vrr"]
+        emitted_keys = set()
+
+        for k in order:
+            if k in fields:
+                val = fields[k]
+                emitted_keys.add(k)
+                out_key = "output" if k == "name" else k
+                if k == "disabled":
+                    b_val = "true" if val.lower() in ("1", "true", "yes", "on") else "false"
+                    self.emit(f"{out_key} = {b_val},")
+                elif k in ("vrr", "scale") and val.isdigit():
+                    self.emit(f"{out_key} = {val},")
+                else:
+                    self.emit(f"{out_key} = {self.quote(self.resolve_val(val))},")
+
+        for k, val in fields.items():
+            if k in emitted_keys:
+                continue
+            k_lower = k.lower()
+            if k_lower == "disabled":
+                b_val = "true" if val.lower() in ("1", "true", "yes", "on") else "false"
+                self.emit(f"{k} = {b_val},")
+            elif k_lower in ("vrr", "supports_wide_color", "supports_hdr", "sdrbrightness", "sdrsaturation", "min_luminance", "max_luminance"):
+                self.emit(f"{k} = {self.to_lua_val(val)},")
+            elif k_lower in ("reserved", "reserved_area"):
+                parts = val.split()
+                if len(parts) == 4:
+                    self.emit(f"{k} = {{ top = {parts[0]}, right = {parts[1]}, bottom = {parts[2]}, left = {parts[3]} }},")
+                elif len(parts) == 1 and parts[0].isdigit():
+                    self.emit(f"{k} = {parts[0]},")
+                else:
+                    self.emit(f"{k} = {self.quote(self.resolve_val(val))},")
+            else:
+                self.emit(f"{k} = {self.quote(self.resolve_val(val))},")
+
+        self.dedent()
+        self.emit("})")
+
+    def visit_permission(self, stmt: PermissionDirective):
+        if stmt.binary and stmt.type and stmt.mode:
+            self.translated_count += 1
+            b = self.quote(self.resolve_val(stmt.binary))
+            t = self.quote(self.resolve_val(stmt.type))
+            m = self.quote(self.resolve_val(stmt.mode))
+            self.emit(f"hl.permission({{ binary = {b}, type = {t}, mode = {m} }})")
+        else:
+            self._reclassify_as_flagged()
+            self.emit("-- TODO: manual review (malformed permission: expected binary, type, mode)")
+            b = self.quote(stmt.binary)
+            t = self.quote(stmt.type)
+            m = self.quote(stmt.mode)
+            self.emit(f"-- hl.permission({{ binary = {b}, type = {t}, mode = {m} }})")
 
     def _reclassify_as_flagged(self):
         # The visitor counted this directive as translated on entry; a

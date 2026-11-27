@@ -41,9 +41,9 @@ hyprlang source (.conf)
 
 ## Features
 
-- **Bindings & Flags**: Transpiles `bind`, `binde`, `bindm`, `bindl`, `bindr`, `bindn`, `bindt`, `bindi`, etc. Correctly handles flags like `{ repeating = true }`, `{ non_consuming = true }`, and release triggers.
-- **Dispatchers**: Maps native dispatchers (`exec`, `workspace`, `movetoworkspace`, `movetoworkspacesilent`, `fullscreen`, `movefocus`, `resizeactive`, `splitratio`, `layoutmsg`, etc.) with correct type signatures and table arguments.
-- **Window Rules & Layer Rules**: Comprehensive support for both `windowrule` and `windowrulev2`, as well as `layerrule`. Multi-word values (`size`, `move`, `opacity`) are converted into Lua tables.
+- **Bindings & Flags**: Transpiles `bind`, `bindd`, `binde`, `bindm`, `bindl`, `bindr`, `bindn`, `bindt`, `bindi`, `bindu`, `bindx`, `bindo`, `bindc`, `bindg`, etc. Correctly handles flags like `{ repeating = true }`, `{ non_consuming = true }`, `{ allow_input_capture = true }`, release triggers, and extracts `bindd` descriptions into `{ description = "..." }`.
+- **Dispatcher Simplification**: Maps native dispatchers with correct type signatures and table arguments, and automatically rewrites legacy `exec, hyprctl dispatch X` into direct `hl.dsp.*` calls to prevent per-keypress process spawning.
+- **Rules & Modern Directives**: Comprehensive support for `windowrule`, `windowrulev2`, `layerrule`, `workspace`, `permission`, and `monitorv2 { ... }` blocks with CSS gap tables (`reserved = { top, right, bottom, left }`).
 - **Animations & Curves**: Directives like `animation =` and `bezier =` (including inside `animations {}` blocks) are converted into top-level `hl.animation()` and `hl.curve()` statements.
 - **Variable Scoping & Expansion**: Converts Hyprland `$variables` into clean `local` Lua definitions and resolves scoped references.
 - **Recursive Directory Walk**: Convert entire multi-file config directories (`--dir`) in one command. Missing `.lua` files are created safely without overwriting existing manual edits unless `--in-place` is specified.
@@ -56,7 +56,17 @@ hyprlang source (.conf)
 
 ## Installation
 
-### Via PyPI (Recommended)
+### Arch Linux (AUR)
+
+```bash
+# Using paru
+paru -S hyprconf2lua
+
+# Using yay
+yay -S hyprconf2lua
+```
+
+### Via PyPI
 
 ```bash
 # Using pip

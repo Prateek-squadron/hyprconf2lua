@@ -18,14 +18,14 @@ GESTURE_ACTION_ARGS = {
 }
 
 BIND_PREFIXES = {"bindm", "binde", "bindr", "bindl", "bindn", "bindo",
-                 "bindt", "bindi", "bindp", "bindc", "bindd"}
+                 "bindt", "bindi", "bindp", "bindc", "bindd", "bindu", "bindx", "bindg"}
 
 BIND_FLAG_MAP = {
     "bind":   "",
     "bindl":  "l",
     "bindr":  "r",
     "bindn":  "n",
-    "bindo":  "",
+    "bindo":  "o",
     "bindm":  "m",
     "binde":  "e",
     "bindt":  "t",
@@ -33,6 +33,9 @@ BIND_FLAG_MAP = {
     "bindp":  "p",
     "bindc":  "c",
     "bindd":  "d",
+    "bindu":  "u",
+    "bindx":  "x",
+    "bindg":  "g",
 }
 
 
@@ -273,8 +276,12 @@ class Parser:
                 return self.parse_general_directive(directive, t.line)
             return self.parse_bind(directive, t.line)
 
-        if directive == "monitor":
+        if directive in ("monitor", "monitorv2"):
+            if self.peek().type == "BLOCK_OPEN":
+                return self.parse_general_directive(directive, t.line)
             return self.parse_monitor(t.line)
+        if directive == "permission":
+            return self.parse_permission(t.line)
         if directive == "windowrule":
             return self.parse_windowrule(False, t.line)
         if directive == "windowrulev2":
@@ -319,10 +326,15 @@ class Parser:
             body = [Directive(sub_key, [val], t.line, 0)]
             return Section(section_name, body, t.line)
 
-        # Handle colon-separated section:key = value (two parts)
+        # Handle colon-separated section:key = value (two parts) or colon-named block section (e.g. monitorv2:HDMI-A-1 { ... })
         if len(colon_parts) == 2:
             section_name = colon_parts[0]
             inner_key = colon_parts[1]
+            if self.peek().type == "BLOCK_OPEN":
+                self.advance()
+                body = self.parse_block(stop="BLOCK_CLOSE")
+                self.expect("BLOCK_CLOSE")
+                return Section(directive, body, t.line)
             self.expect("EQUALS")
             val = self.parse_value_rest()
             body = [Directive(inner_key, [val], t.line, 0)]
@@ -350,18 +362,32 @@ class Parser:
         self.expect("EQUALS")
         self.skip_newlines()
         values = self.parse_comma_values(keep_string_quotes=True)
-        if len(values) < 3:
-            raise ParserError(f"bind needs at least 3 arguments (mods, key, dispatcher), got {len(values)}", Token("IDENT", directive, line, 0))
-        mods_str = values[0].strip()
-        key = values[1].strip()
-        dispatcher = values[2].strip()
-        if dispatcher in ("exec", "execr") and len(values) > 3:
-            cmd = ",".join(v.strip() for v in values[3:]).strip()
-            params = [cmd] if cmd else []
+        if "d" in flags:
+            if len(values) < 4:
+                raise ParserError(f"bindd needs at least 4 arguments (mods, key, description, dispatcher), got {len(values)}", Token("IDENT", directive, line, 0))
+            mods_str = values[0].strip()
+            key = values[1].strip()
+            description = values[2].strip()
+            dispatcher = values[3].strip()
+            if dispatcher in ("exec", "execr") and len(values) > 4:
+                cmd = ",".join(v.strip() for v in values[4:]).strip()
+                params = [cmd] if cmd else []
+            else:
+                params = [v.strip() for v in values[4:]]
         else:
-            params = [v.strip() for v in values[3:]]
+            if len(values) < 3:
+                raise ParserError(f"bind needs at least 3 arguments (mods, key, dispatcher), got {len(values)}", Token("IDENT", directive, line, 0))
+            mods_str = values[0].strip()
+            key = values[1].strip()
+            description = None
+            dispatcher = values[2].strip()
+            if dispatcher in ("exec", "execr") and len(values) > 3:
+                cmd = ",".join(v.strip() for v in values[3:]).strip()
+                params = [cmd] if cmd else []
+            else:
+                params = [v.strip() for v in values[3:]]
         mods = [m.strip() for m in mods_str.replace(",", " ").split() if m.strip() and m.strip() != "&"] if mods_str else []
-        return BindDirective(mods, key, dispatcher, params, flags, line)
+        return BindDirective(mods, key, dispatcher, params, flags, line, description=description)
 
     def parse_monitor(self, line: int) -> MonitorDirective:
         self.expect("EQUALS")
@@ -620,6 +646,14 @@ class Parser:
         self.expect("EQUALS")
         values = self.parse_comma_values()
         return Directive("submap", values, line, 0)
+
+    def parse_permission(self, line: int) -> PermissionDirective:
+        self.expect("EQUALS")
+        values = self.parse_comma_values()
+        binary = values[0].strip() if len(values) > 0 else ""
+        type_ = values[1].strip() if len(values) > 1 else ""
+        mode = values[2].strip() if len(values) > 2 else ""
+        return PermissionDirective(binary, type_, mode, line)
 
 
 def parse_config(source: str) -> ConfigFile:

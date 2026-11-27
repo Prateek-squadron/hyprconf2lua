@@ -52,6 +52,7 @@ class BindDirective:
     params: List[str]
     flags: str
     line: int
+    description: Optional[str] = None
 
 
 @dataclass
@@ -162,12 +163,20 @@ class LayerRuleBlock:
     line: int
 
 
+@dataclass
+class PermissionDirective:
+    binary: str
+    type: str
+    mode: str
+    line: int
+
+
 BlockStmt = Union[
     Directive, Section, VariableDef, ExecDirective, BindDirective,
     MonitorDirective, WindowRule, AnimationDirective, BezierDirective,
     EnvDirective, SourceDirective, DeviceSection, GestureDirective,
     WorkspaceDirective, LayerRuleDirective, SubmapDef, Comment,
-    WindowRuleBlock, LayerRuleBlock,
+    WindowRuleBlock, LayerRuleBlock, PermissionDirective,
 ]
 
 Block = List[BlockStmt]

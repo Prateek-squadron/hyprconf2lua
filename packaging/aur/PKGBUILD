@@ -1,0 +1,36 @@
+# Maintainer: Prateek <https://github.com/Prateek-squadron>
+pkgname=hyprconf2lua
+pkgver=1.9.0
+pkgrel=1
+pkgdesc='Convert Hyprland hyprlang (.conf) configurations to Lua (.lua) format (v0.55+)'
+arch=('any')
+url='https://github.com/Prateek-squadron/hyprconf2lua'
+license=('MIT')
+depends=('python')
+makedepends=('python-build' 'python-installer' 'python-wheel' 'python-setuptools')
+checkdepends=('python-pytest')
+provides=('python-hyprconf2lua')
+conflicts=('python-hyprconf2lua')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "$pkgname-$pkgver"
+  python -m build --wheel --no-isolation
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  PYTHONPATH=src pytest
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  if python -c "import installer" 2>/dev/null; then
+    python -m installer --destdir="$pkgdir" dist/*.whl
+  else
+    python -m pip install --root="$pkgdir" --no-deps --no-warn-script-location dist/*.whl
+  fi
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
