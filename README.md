@@ -12,6 +12,11 @@
   <a href="https://github.com/Prateek-squadron/hyprconf2lua/actions/workflows/ci.yml"><img src="https://github.com/Prateek-squadron/hyprconf2lua/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
 </p>
 
+<p align="center">
+  🌐 <strong>Try it live online:</strong> <a href="https://prateek-squadron.github.io/hyprconf2lua/"><strong>prateek-squadron.github.io/hyprconf2lua</strong></a><br>
+  <em>Runs 100% client-side via WebAssembly (Pyodide) — zero installation required, your config never leaves your browser.</em>
+</p>
+
 ---
 
 ## Overview

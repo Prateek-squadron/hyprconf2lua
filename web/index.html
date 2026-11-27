@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hyprconf2lua — Hyprland Config Transpiler (In-Browser)</title>
+  <meta name="description" content="Online AST-based converter from legacy Hyprland hyprlang (.conf) configurations to modern Lua format (v0.55+). Zero backend, runs 100% locally in your browser via WebAssembly.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.2/full/pyodide.js"></script>
+  <script src="hyprconf2lua_bundle.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo-icon">⚡</span>
+      <div class="brand-text">
+        <span class="title">hyprconf2lua</span>
+        <span class="version-tag">v1.9.0</span>
+      </div>
+    </div>
+
+    <div class="engine-status" id="engine-status">
+      <span class="status-dot loading" id="status-dot"></span>
+      <span class="status-text" id="status-text">Initializing Python WebAssembly runtime...</span>
+    </div>
+
+    <div class="nav-actions">
+      <button type="button" class="btn btn-secondary" id="sample-btn" title="Load sample hyprland.conf">
+        <span>📄</span> Load Sample
+      </button>
+      <label class="btn btn-secondary" id="upload-label" title="Upload local .conf file">
+        <span>📁</span> Upload
+        <input type="file" id="file-upload" accept=".conf,.txt" hidden>
+      </label>
+      <button type="button" class="btn btn-secondary" id="clear-btn" title="Clear input">
+        <span>🗑️</span> Clear
+      </button>
+      <a href="https://github.com/Prateek-squadron/hyprconf2lua" target="_blank" rel="noopener noreferrer" class="btn btn-outline" title="GitHub Repository">
+        <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        GitHub
+      </a>
+      <a href="https://aur.archlinux.org/packages/hyprconf2lua" target="_blank" rel="noopener noreferrer" class="btn btn-outline" title="Arch User Repository">
+        AUR
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Pane: Input -->
+    <section class="editor-pane input-pane">
+      <div class="pane-header">
+        <div class="pane-title">
+          <span class="file-icon">📝</span>
+          <span>Input (<span class="filename">hyprland.conf</span>)</span>
+        </div>
+        <div class="pane-stats">
+          <span id="input-stats">0 lines</span>
+        </div>
+      </div>
+      <div class="editor-body">
+        <div class="gutter" id="input-gutter" aria-hidden="true"></div>
+        <textarea id="input-editor" spellcheck="false" placeholder="# Paste your hyprland.conf here or click 'Load Sample' above...&#10;# The conversion runs 100% locally in your browser via WebAssembly."></textarea>
+      </div>
+    </section>
+
+    <!-- Resizable Divider -->
+    <div class="divider" id="divider" title="Drag to resize"></div>
+
+    <!-- Right Pane: Output -->
+    <section class="editor-pane output-pane">
+      <div class="pane-header">
+        <div class="pane-title">
+          <span class="file-icon">🌙</span>
+          <span>Output (<span class="filename">hyprland.lua</span>)</span>
+        </div>
+        <div class="metrics-bar" id="metrics-bar">
+          <span class="metric metric-translated" id="metric-translated" title="Directives fully transpiled">
+            <span class="metric-icon">✓</span> <span id="val-translated">0</span>
+          </span>
+          <span class="metric metric-passthrough" id="metric-passthrough" title="Sections and raw structures passed through">
+            <span class="metric-icon">•</span> <span id="val-passthrough">0</span>
+          </span>
+          <span class="metric metric-flagged" id="metric-flagged" title="Directives requiring manual review">
+            <span class="metric-icon">⚠</span> <span id="val-flagged">0</span>
+          </span>
+        </div>
+        <div class="pane-actions">
+          <button type="button" class="btn btn-sm btn-primary" id="copy-btn" title="Copy Lua code to clipboard">
+            <span>📋</span> Copy
+          </button>
+          <button type="button" class="btn btn-sm btn-secondary" id="download-btn" title="Download hyprland.lua">
+            <span>⬇️</span> Download
+          </button>
+        </div>
+      </div>
+      <div class="error-banner" id="error-banner" style="display: none;">
+        <span class="error-icon">❌</span>
+        <span class="error-message" id="error-message"></span>
+      </div>
+      <div class="editor-body">
+        <div class="gutter" id="output-gutter" aria-hidden="true"></div>
+        <textarea id="output-editor" spellcheck="false" readonly placeholder="-- Transpiled Lua output will appear here automatically..."></textarea>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
